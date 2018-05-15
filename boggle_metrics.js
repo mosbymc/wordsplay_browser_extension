@@ -1,28 +1,16 @@
 var version = 2;
-var boggleDB;
 
-// In the following line, you should include the prefixes of implementations you want to test.
 window.indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
-// DON'T use "var indexedDB = ..." if you're not in a function.
-// Moreover, you may need references to some window.IDB* objects:
 window.IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction || window.msIDBTransaction;
 window.IDBKeyRange = window.IDBKeyRange || window.webkitIDBKeyRange || window.msIDBKeyRange;
-// (Mozilla has never prefixed these objects, so we don't need window.mozIDB*)
 
-// Let us open version 4 of our database
 var request = window.indexedDB.open("boggle_metrics", version);
 
-// these two event handlers act on the database being opened successfully, or not
-request.onerror = function _onError(event) {};
-
 request.onsuccess = function _onSuccess(event) {
-    // store the result of opening the database in the db variable. This is used a lot later on, for opening transactions and suchlike.
-    //boggleDB = fromNullable(request.result);
-    let objectStore = event.target.result.transaction(['boggle_metrics'], 'readwrite');
-    var t = objectStore.objectStore('boggle_metrics');
-    var flag = false;
-
-    let countRequest = t.count();
+    let objectStore = event.target.result.transaction(['boggle_metrics'], 'readwrite'),
+        t = objectStore.objectStore('boggle_metrics'),
+        flag = false,
+        countRequest = t.count();
 
     countRequest.onsuccess = function _success() {
         if (countRequest.result > 0) {
@@ -32,33 +20,20 @@ request.onsuccess = function _onSuccess(event) {
                 flag = true;
                 let data = evt.target.result;
                 data.highestScore += 1;
-                data.averageScore = 1;
-                data.highestRank = 1;
-                data.lowestRank = 1;
-                data.mostGameWords = 1;
-                data.averageWordPoints = 1;
-                data.averageGameWords = 1;
-                data.averageRankPercentile = 1;
                 data.bestRank = 1;
                 data.uniqueWords = [];
                 data.gamesPlayed = 1;
                 data.wordsCount = 1;
 
-                let updateRequest = t.put(data);
+                t.put(data);
             };
         }
         else {
             t.add({
                 id: 1,
                 highestScore: 1,
-                lowestScore: 1,
-                highestRank: 1,
-                lowestRank: 1,
-                mostGameWords: 1,
-                averageWordPoints: 1,
-                averageRankPercentile: 1,
                 bestRank: 1,
-                uniqueWords: 1,
+                uniqueWords: [],
                 longestWords: 1,
                 wordsCount: 1,
                 gamesPlayed: 1
@@ -73,33 +48,30 @@ request.onupgradeneeded = function _onUpgradeNeeded(event) {
     db.deleteObjectStore('boggle_words');
 
     // Create an objectStore for this database
-    var metrics = db.createObjectStore("boggle_metrics", { keyPath: 'id', autoIncrement: false });
-    var words = db.createObjectStore("boggle_words", { keyPath: 'id', autoIncrement: false });
+    db.createObjectStore("boggle_metrics", { keyPath: 'id', autoIncrement: false });
+    db.createObjectStore("boggle_words", { keyPath: 'id', autoIncrement: false });
 };
 
 /**
  * Metrics:
+ * - Games Played
  * - Highest Score
  * - Average Score
- * - Games Played
- * - Longest Word
- * - Average Rank
+ * - Lowest Score
  * - Highest Rank
  * - Lowest Rank
+ * - Average Rank Percentile
+ * - Most Words in a Game
+ * - Average Number of Words in a Game
+ * - Average Number of Points in a Game
  * - Average Word Length
  * - Average Word Points
- * - Most Words in a Game
- * - Average Number of Words
+ * - Average Words in a Game
+ * - Longest Words
+ * - Unique Words
  */
 
 /**
- * Personal game data is stored in the globally available "d_" variable: d_.boards["game_id"]
- * Will need to split the words available in the board to transform into an array and then find the words in the array based on the words guessed
- * Score is provided on each game under "d_.boards"
- *
- * Ideally, I will find an event that I can listen to that signals the end of a round... also the beginning so I can implement a "timeout" feature to stop
- * counting the current game if the player goes "inactive"
- *
  * Will need a "content script" (https://developer.chrome.com/extensions/content_scripts) in order to gather data from wordsplay.net +
  * a background.html page in order to display the metrics.
  */
@@ -118,9 +90,7 @@ setInterval(function _gameMonitor() {
                 //If the minGameTime is not equal to or less than the current time remaining,
                 //then don't bother setting the 'startTime' variable - we'll just skip including
                 //this game's results and start recording data on the next game
-                if (minGameTime <= time) {
-                    startTime = time
-                }
+                if (minGameTime <= time) startTime = time
             }
         }
     }
@@ -142,11 +112,11 @@ setInterval(function _gameMonitor() {
             if (!recordedMetrics) {
                 saveGameMetrics(computeMetrics(getGameWords(), getUniqueWords(), getGameRank()));
                 recordedMetrics = true;
+                startTime = -1;
             }
         }
     }
 }, 5);
-
 
 function getGameWords() {
     let wordDiv = document.getElementById('ext-gen342');
@@ -181,10 +151,12 @@ function getUniqueWords() {
 
 function computeMetrics(words, uniques, ranking) {
     let longest = 0,
-        totalPoints = 0;
+        totalPoints = 0,
+        totalChars = 0;
 
     words.forEach(function _findLongestWord(w) {
         if (w.word.length > longest) longest = w.word.length;
+        totalChars += w.word.length;
     });
 
     words.map(word => word.points).forEach(point => totalPoints += point);
@@ -197,6 +169,7 @@ function computeMetrics(words, uniques, ranking) {
         rankPercentile: { value: ranking.rank / ranking.totalPlayers },
         averageWordPoints: { value: totalPoints / words.length },
         words: { value: words.map(word => word.word) },
+        charCount: totalChars,
         uniqueWords: { value: uniques }
     });
 }
@@ -215,24 +188,22 @@ function saveGameMetrics(metrics) {
                     let data = evt.target.result;
                     data.highestScore = metrics.score > data.highestScore ? metrics.score : data.highestScore;
                     data.averageScore = ((data.gamesPlayed * data.averageScore) + metrics.score) / (data.gamesPlayed + 1);
+                    data.lowestScore = metrics.score < data.lowestScore ? metrics.score : data.lowestScore;
                     data.highestRank = metrics.rank > data.highestRank ? metrics.rank : data.highestRank;
                     data.lowestRank = metrics.rank < data.lowestRank ? metrics.rank : data.lowestRank;
                     data.mostGameWords = metrics.words.length > data.mostGameWords ? metrics.words.length : data.mostGameWords;
                     data.averageWordPoints = ((data.wordsCount * data.averageWordPoints) + metrics.points) / (data.wordsCount + metrics.words.length);
+                    data.averageGamePoints = ((data.wordsCount + metrics.words.length) * data.averageWordPoints) / (data.gamesPlayed);
                     data.averageGameWords = ((data.wordsCount * data.gamesPlayed) + metrics.words.length) / (data.gamesPlayed + 1);
                     data.averageRankPercentile = ((data.gamesPlayed * data.averageRankPercentile) + metrics.rankPercentile) / (data.gamesPlayed + 1);
+                    data.averageWordLength = ((data.averageWordLength * data.wordsCount) + metrics.charCount) / (data.wordsCount + metrics.words.length);
                     data.uniqueWords = unionWords(data.uniqueWords, metrics.uniqueWords);
 
-                    if (metrics.longestWords[0].length > data.longestWords[0].length) {
-                        data.longestWords = metrics.longestWords;
-                    }
-                    else if (metrics.longestWords[0].length === data.longestWords[0].length) {
-                        data.longestWords = unionWords(data.longestWords, metrics.longestWords);
-                    }
+                    if (metrics.longestWords[0].length > data.longestWords[0].length) data.longestWords = metrics.longestWords;
+                    else if (metrics.longestWords[0].length === data.longestWords[0].length) data.longestWords = unionWords(data.longestWords, metrics.longestWords);
 
                     data.gamesPlayed += 1;
                     data.wordsCount = data.wordsCount + metrics.words.length;
-
                     store.put(data);
                 };
 
@@ -242,11 +213,15 @@ function saveGameMetrics(metrics) {
                 store.add({
                     id: metrics.id,
                     highestScore: metrics.score,
+                    averageScore: metrics.score,
                     lowestScore: metrics.score,
                     highestRank: metrics.rank,
                     lowestRank: metrics.rank,
                     mostGameWords: metrics.words.length,
                     averageWordPoints: metrics.averageWordPoints,
+                    averageGamePoints: metrics.score,
+                    averageGameWords: metrics.words.length,
+                    averageWordLength: metrics.charCount / metrics.words.length,
                     averageRankPercentile: metrics.rankPercentile,
                     uniqueWords: metrics.uniqueWords,
                     longestWords: metrics.longestWords,
@@ -293,15 +268,12 @@ function getGameMetrics(cb) {
                 metricsRequest.onsuccess = evt => cv(evt.target.result);
                 metricsRequest.onerror = () => cb(null);
             }
-            else {
-                cb(null);
-            }
+            else cb(null);
         };
     };
 
     db.onerror = () => cb(null);
 }
-
 
 chrome.runtime.onMessage.addListener(
     function _messageHandler(request, sender, sendResponse) {
