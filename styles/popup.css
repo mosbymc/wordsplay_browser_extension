@@ -6,4 +6,16 @@ body {
 .metrics_div {
     width: auto;
     margin: 10px;
+    font-size: 16px;
+}
+
+.title_span {
+    font-weight: bold;
+}
+
+#title {
+    font-size: 20px;
+    font-weight: bold;
+    width: auto;
+    margin: auto;
 }

@@ -29,17 +29,26 @@ getMetrics(function _metricsCallback(metrics) {
             let divId = div.id;
             if (divId in metrics) {
                 if ('longestWords' !== divId && 'uniqueWords' !== divId) {
-                    let span = document.createElement('span');
-                    span.innerText = metricsDesc[divId] + metrics[divId];
-                    div.appendChild(span);
+                    let titleSpan = document.createElement('span');
+                    titleSpan.classList.add('title_span');
+                    titleSpan.innerText = metricsDesc[divId];
+
+                    let contentSpan = document.createElement('span');
+                    contentSpan.classList.add('content_span');
+                    contentSpan.innerText = metrics[divId];
+
+                    div.appendChild(titleSpan);
+                    div.appendChild(contentSpan);
                 }
                 else {
                     let descSpan = document.createElement('span');
+                    descSpan.classList.add('title_span');
                     descSpan.innerText = metricsDesc[divId];
                     div.appendChild(descSpan);
 
                     metrics[divId].forEach(function _createWordSpans(word, idx) {
                         let span = document.createElement('span');
+                        span.classList.add('content_span');
                         let comma = idx === metrics[divId].length - 1 ? '' : ', ';
                         span.innerText = word + comma;
                         div.appendChild(span);
@@ -55,4 +64,3 @@ getMetrics(function _metricsCallback(metrics) {
             }
         });
 });
-

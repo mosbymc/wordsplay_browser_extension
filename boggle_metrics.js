@@ -101,14 +101,21 @@ function getGameWords() {
 }
 
 function getGameRank() {
-    let rank = Array.prototype.concat.apply([], Array.from(document.querySelectorAll('.me'))
-            .map(div => Array.from(div.querySelectorAll('.x-grid3-cell-inner'))))[0].innerText,
-        totalPlayers = Array.from(document.getElementById('ext-gen493').querySelectorAll('.x-grid3-row'));
+    try {
+        let rank = Array.prototype.concat.apply([], Array.from(document.querySelectorAll('.me'))
+                .map(div => Array.from(div.querySelectorAll('.x-grid3-cell-inner'))))[0].innerText,
+            totalPlayers = Array.from(document.getElementById('ext-gen493').querySelectorAll('.x-grid3-row'));
 
-    return {
-        rank: Number.parseInt(rank),
-        totalPlayers: Number.parseInt(totalPlayers[totalPlayers.length - 1].querySelectorAll('.x-grid3-cell-inner')[0].innerText)
-    };
+        return {
+            rank: Number.parseInt(rank),
+            totalPlayers: Number.parseInt(totalPlayers[totalPlayers.length - 1].querySelectorAll('.x-grid3-cell-inner')[0].innerText)
+        };
+    }
+        //If the player guess no words, then there is no span with a 'me' class, so the attempt to get the innerText will throw.
+        //Since we don't record games with no points anyway, we just return a dummy object here - it won't be recorded
+    catch(e) {
+        return { rank: 0, totalPlayers: 0 };
+    }
 }
 
 function getUniqueWords() {
@@ -168,7 +175,7 @@ function saveGameMetrics(metrics) {
                         data.mostGameWords = metrics.words.length > data.mostGameWords ? metrics.words.length : data.mostGameWords;
                         data.averageWordPoints = ((data.wordsCount * data.averageWordPoints) + metrics.score) / (data.wordsCount + metrics.words.length);
                         data.averageGamePoints = ((data.wordsCount + metrics.words.length) * data.averageWordPoints) / (data.gamesPlayed);
-                        data.averageGameWords = ((data.wordsCount * data.gamesPlayed) + metrics.words.length) / (data.gamesPlayed + 1);
+                        data.averageGameWords = (data.wordsCount + metrics.words.length) / (data.gamesPlayed + 1);
                         data.averageRankPercentile = ((data.gamesPlayed * data.averageRankPercentile) + metrics.rankPercentile) / (data.gamesPlayed + 1);
                         data.averageWordLength = ((data.averageWordLength * data.wordsCount) + metrics.charCount) / (data.wordsCount + metrics.words.length);
                         data.uniqueWords = unionWords(data.uniqueWords, metrics.uniqueWords);
