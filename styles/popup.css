@@ -1,0 +1,9 @@
+body {
+    width: 800px;
+    height: 100px;
+}
+
+.metrics_div {
+    width: auto;
+    margin: 10px;
+}

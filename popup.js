@@ -1,14 +1,18 @@
 var metricsDesc = {
-    gamesPlayed: 'Games Played: ',
     highestScore: 'Highest Score: ',
+    averageScore: 'Average Score: ',
     lowestScore: 'Lowest Score: ',
     highestRank: 'Highest Rank: ',
     lowestRank: 'Lowest Rank: ',
     averageRankPercentile: 'Average Rank Percentile: ',
     mostGameWords: 'Most Words In A Game: ',
     averageWordPoints: 'Average Points Per Words: ',
+    averageGamePoints: 'Average Points in a Game: ',
+    averageGameWords: 'Average Words in a Game: ',
+    averageWordLength: 'Average Word Length: ',
     uniqueWords: 'Unique Words: ',
-    longestWords: 'Longest Words: '
+    longestWords: 'Longest Words: ',
+    gamesPlayed: 'Games Played: '
 };
 
 function getMetrics(cb) {
@@ -34,12 +38,21 @@ getMetrics(function _metricsCallback(metrics) {
                     descSpan.innerText = metricsDesc[divId];
                     div.appendChild(descSpan);
 
+                    metrics[divId].forEach(function _createWordSpans(word, idx) {
+                        let span = document.createElement('span');
+                        let comma = idx === metrics[divId].length - 1 ? '' : ', ';
+                        span.innerText = word + comma;
+                        div.appendChild(span);
+                    });
+
+                    /*
                     for (let word in metrics[divId]) {
                         let span = document.createElement('span');
                         span.innerText = word;
                         div.appendChild(span);
-                    }
+                    }*/
                 }
             }
         });
 });
+
