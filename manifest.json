@@ -3,6 +3,7 @@
   "name": "Chrome Wordsplay Extension",
   "version": "1.0.0",
   "description": "A Chrome browser extension for the wordsplay.net game to keep track of metrics during game play",
+  "options_page": "options.html",
   "background": {
     "scripts": ["background.js"],
     "persistent": false
@@ -18,10 +19,11 @@
   "permissions": [
     "webNavigation",
     "declarativeContent",
-    "activeTab"
+    "activeTab",
+    "storage"
   ],
   "page_action": {
-    "default_title" : "There's a 'G' in this URL!",
+    "default_title" : "Boggle Metrics",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "images/boggle_16.png",

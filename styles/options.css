@@ -1,0 +1,26 @@
+body {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+#desc {
+    width: 600px;
+    margin-bottom: 10px;
+}
+
+#time {
+    margin-bottom: 10px;
+}
+
+.error {
+    color: red;
+    border: 1px solid red;
+    border-radius: 5px;
+    margin-left: 5px;
+    padding: 2px;
+    font-size: 12px;
+}
+
+#options_div {
+    margin-bottom: 15px;
+}

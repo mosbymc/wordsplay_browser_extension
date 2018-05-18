@@ -1,0 +1,40 @@
+<html>
+<head>
+    <link rel="stylesheet" href="./styles/options.css" />
+</head>
+<body>
+<div id='desc'>
+    Set these values to change the minimum game time or words that are required for a single
+    game's metrics to be recored.
+    <br><br>
+    The default minimum game time is 120 seconds, which means that
+    from the time the 5 x 5 boggle game page is loaded, at least 2 minutes must remain on the clock
+    for the extension to record the metrics. Because the extension must run on a timer that fires
+    every few seconds, the maximum time you should enter is 175 second (2:55) and not 180 seconds
+    because there's a good chance the timer won't pick up on the true start of the game.
+    <br><br>
+    The default minimum game words is 1, which means that you must get at least one word in a game in order
+    for the extension to recored the game's metrics. The value cannot be set to less than 1.
+    <br><br>
+    Both minimums are required to be met, not either/or.
+</div>
+<br>
+<div id='options_div'>
+    <div id='time'>
+                <span>
+                    Minimum Game Time (In Seconds): <input type='text' id='min_time' />
+                </span>
+    </div>
+    <div id='words'>
+                <span>
+                    Mimimum Words: <input type='text' id='min_words' />
+                </span>
+    </div>
+</div>
+<div>
+    When you are done adjusting the values, just close the window. The extension updates the values as you type,
+    so there's no need to explicitly 'save' the values.
+</div>
+</body>
+<script src='./options.js'></script>
+</html>

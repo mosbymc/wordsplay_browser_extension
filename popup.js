@@ -1,9 +1,12 @@
+var identity = val => val;
+var threeDecimals = val => Number.isInteger(val) ? val : val.toFixed(3);
+
 var metricsDesc = {
     highestScore: 'Highest Score: ',
     averageScore: 'Average Score: ',
     lowestScore: 'Lowest Score: ',
-    highestRank: 'Highest Rank: ',
-    lowestRank: 'Lowest Rank: ',
+    worstRank: 'Worst Rank: ',
+    bestRank: 'Best Rank: ',
     averageRankPercentile: 'Average Rank Percentile: ',
     mostGameWords: 'Most Words In A Game: ',
     averageWordPoints: 'Average Points Per Words: ',
@@ -13,6 +16,19 @@ var metricsDesc = {
     uniqueWords: 'Unique Words: ',
     longestWords: 'Longest Words: ',
     gamesPlayed: 'Games Played: '
+};
+
+var metricsModifier = {
+    highestScore: identity,
+    averageScore: threeDecimals,
+    lowestScore: identity,
+    averageRankPercentile: threeDecimals,
+    mostGameWords: identity,
+    averageWordPoints: threeDecimals,
+    averageGamePoints: threeDecimals,
+    averageGameWords: threeDecimals,
+    averageWordLength: threeDecimals,
+    gamesPlayed: identity
 };
 
 function getMetrics(cb) {
@@ -35,7 +51,9 @@ getMetrics(function _metricsCallback(metrics) {
 
                     let contentSpan = document.createElement('span');
                     contentSpan.classList.add('content_span');
-                    contentSpan.innerText = metrics[divId];
+
+                    if ('worstRank' !== divId && 'bestRank' !== divId) contentSpan.innerText = metricsModifier[divId](metrics[divId]);
+                    else contentSpan.innerText = metrics[divId].rank + ' / ' + metrics[divId].totalPlayers;
 
                     div.appendChild(titleSpan);
                     div.appendChild(contentSpan);
@@ -53,13 +71,6 @@ getMetrics(function _metricsCallback(metrics) {
                         span.innerText = word + comma;
                         div.appendChild(span);
                     });
-
-                    /*
-                    for (let word in metrics[divId]) {
-                        let span = document.createElement('span');
-                        span.innerText = word;
-                        div.appendChild(span);
-                    }*/
                 }
             }
         });

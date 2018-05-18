@@ -1,6 +1,5 @@
 <html>
 <head>
-    <title>Anti-track Options</title>
     <link rel="stylesheet" href="./styles/popup.css" />
 </head>
 <body>
@@ -8,21 +7,47 @@
     Boggle Metrics
 </div>
 <div id='metrics_div'>
-    <div id='gamesPlayed' class='metrics_div'></div>
-    <div id='highestScore' class='metrics_div'></div>
-    <div id='averageScore' class='metrics_div'></div>
-    <div id='lowestScore' class='metrics_div'></div>
-    <div id='highestRank' class='metrics_div'></div>
-    <div id='lowestRank' class='metrics_div'></div>
-    <div id='averageRankPercentile' class='metrics_div'></div>
-    <div id='mostGameWords' class='metrics_div'></div>
-    <div id='averageGameWords' class='metrics_div'></div>
-    <div id='averageGamePoints' class='metrics_div'></div>
-    <div id='averageWordPoints' class='metrics_div'></div>
-    <div id='averageWordLength' class='metrics_div'></div>
-    <div id='uniqueWords' class='metrics_div'></div>
-    <div id='longestWords' class='metrics_div'></div>
+    <div class='group'>
+        <span class='group_span'>Score Metrics</span>
+        <div id='highestScore' class='metrics_div'>
+        </div>
+        <div id='averageScore' class='metrics_div'>
+        </div>
+        <div id='lowestScore' class='metrics_div'>
+        </div>
+    </div>
+    <div class='group'>
+        <span class='group_span'>Rank Metrics</span>
+        <div id='worstRank' class='metrics_div'>
+        </div>
+        <div id='bestRank' class='metrics_div'>
+        </div>
+        <div id='averageRankPercentile' class='metrics_div'>
+        </div>
+    </div>
+    <div class='group'>
+        <span class='group_span'>Word Metrics</span>
+        <div id='mostGameWords' class='metrics_div'>
+        </div>
+        <div id='averageGameWords' class='metrics_div'>
+        </div>
+        <div id='averageWordPoints' class='metrics_div'>
+        </div>
+        <div id='averageWordLength' class='metrics_div'>
+        </div>
+        <div id='uniqueWords' class='metrics_div'>
+        </div>
+        <div id='longestWords' class='metrics_div'>
+        </div>
+    </div>
+    <div class='group'>
+        <span class='group_span'>Misc Metrics</span>
+        <div id='gamesPlayed' class='metrics_div'>
+        </div>
+        <div id='averageGamePoints' class='metrics_div'>
+        </div>
+    </div>
 </div>
 </body>
-<script src='popup.js'></script>
+<script src='./popup.js'></script>
 </html>

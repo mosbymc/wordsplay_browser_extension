@@ -29,6 +29,7 @@ window.IDBKeyRange = window.IDBKeyRange || window.webkitIDBKeyRange || window.ms
  */
 
 var minGameTime = 120000,
+    minGameWords = 1,
     startTime = -1,
     recordedMetrics = false,
     computing = false,
@@ -140,7 +141,7 @@ function computeMetrics(words, uniques, ranking) {
         score: { value: totalPoints },
         wordsCount: { value: words.length },
         longestWords: { value: words.filter(w => w.word.length === longest).map(w => w.word) },
-        rank: { value: ranking.rank },
+        rankings: { value: ranking },
         rankPercentile: { value: ranking.rank / ranking.totalPlayers },
         averageWordPoints: { value: totalPoints / words.length },
         words: { value: words.map(word => word.word) },
@@ -170,12 +171,21 @@ function saveGameMetrics(metrics) {
                         data.highestScore = metrics.score > data.highestScore ? metrics.score : data.highestScore;
                         data.averageScore = ((data.gamesPlayed * data.averageScore) + metrics.score) / (data.gamesPlayed + 1);
                         data.lowestScore = metrics.score < data.lowestScore ? metrics.score : data.lowestScore;
-                        data.highestRank = metrics.rank > data.highestRank ? metrics.rank : data.highestRank;
-                        data.lowestRank = metrics.rank < data.lowestRank ? metrics.rank : data.lowestRank;
+
+                        if (metrics.rankings.rank > data.worstRank.rank) data.worstRank = metrics.rankings;
+                        else if (metrics.rankings.rank === data.worstRank.rank) {
+                            if (metric.rankings.totalPlayers < data.worstRank.totalPlayers) data.worstRank = metrics.worstRank;
+                        }
+                        if (metrics.rankings.rank < data.bestRank.rank) data.bestRank = metrics.rankings;
+                        else if (metrics.rankings.rank === data.bestRank.rank) {
+                            if (metrics.rankings.totalPlayers > data.bestRank.totalPlayers) data.bestRank = metrics.rankings;
+                        }
+
                         data.mostGameWords = metrics.words.length > data.mostGameWords ? metrics.words.length : data.mostGameWords;
                         data.averageWordPoints = ((data.wordsCount * data.averageWordPoints) + metrics.score) / (data.wordsCount + metrics.words.length);
-                        data.averageGamePoints = ((data.wordsCount + metrics.words.length) * data.averageWordPoints) / (data.gamesPlayed);
+                        data.averageGamePoints = ((data.wordsCount + metrics.words.length) * data.averageWordPoints) / (data.gamesPlayed + 1);
                         data.averageGameWords = (data.wordsCount + metrics.words.length) / (data.gamesPlayed + 1);
+
                         data.averageRankPercentile = ((data.gamesPlayed * data.averageRankPercentile) + metrics.rankPercentile) / (data.gamesPlayed + 1);
                         data.averageWordLength = ((data.averageWordLength * data.wordsCount) + metrics.charCount) / (data.wordsCount + metrics.words.length);
                         data.uniqueWords = unionWords(data.uniqueWords, metrics.uniqueWords);
@@ -196,8 +206,8 @@ function saveGameMetrics(metrics) {
                         highestScore: metrics.score,
                         averageScore: metrics.score,
                         lowestScore: metrics.score,
-                        highestRank: metrics.rank,
-                        lowestRank: metrics.rank,
+                        worstRank: metrics.rankings,
+                        bestRank: metrics.rankings,
                         mostGameWords: metrics.words.length,
                         averageWordPoints: metrics.averageWordPoints,
                         averageGamePoints: metrics.score,
@@ -255,3 +265,11 @@ chrome.runtime.onMessage.addListener(
         }
     }
 );
+
+chrome.storage.sync.get(['min_time'], function _storageRequestCallback(result) {
+    minGameTime = result && result.min_time ? result.min_time * 1000 : minGameTime;
+});
+
+chrome.storage.sync.get(['min_words'], function _storageRequestCallback(result) {
+    minGameWords = result && result.min_words ? result.min_words : minGameWords;
+});
