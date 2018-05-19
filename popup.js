@@ -10,7 +10,6 @@ var metricsDesc = {
     averageRankPercentile: 'Average Rank Percentile: ',
     mostGameWords: 'Most Words In A Game: ',
     averageWordPoints: 'Average Points Per Words: ',
-    averageGamePoints: 'Average Points in a Game: ',
     averageGameWords: 'Average Words in a Game: ',
     averageWordLength: 'Average Word Length: ',
     uniqueWords: 'Unique Words: ',
@@ -25,7 +24,6 @@ var metricsModifier = {
     averageRankPercentile: threeDecimals,
     mostGameWords: identity,
     averageWordPoints: threeDecimals,
-    averageGamePoints: threeDecimals,
     averageGameWords: threeDecimals,
     averageWordLength: threeDecimals,
     gamesPlayed: identity

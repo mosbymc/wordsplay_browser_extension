@@ -1,8 +1,5 @@
 var version = 1;
-
 window.indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
-window.IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction || window.msIDBTransaction;
-window.IDBKeyRange = window.IDBKeyRange || window.webkitIDBKeyRange || window.msIDBKeyRange;
 
 /**
  * Metrics:
@@ -23,26 +20,29 @@ window.IDBKeyRange = window.IDBKeyRange || window.webkitIDBKeyRange || window.ms
  * - Unique Words
  */
 
-/**
- * Will need a "content script" (https://developer.chrome.com/extensions/content_scripts) in order to gather data from wordsplay.net +
- * a background.html page in order to display the metrics.
- */
-
 var minGameTime = 120000,
     minGameWords = 1,
     startTime = -1,
     recordedMetrics = false,
     computing = false,
-    boggleMetrics = {
-        id: 1,
-        score: 0,
-        wordsCount: 0,
-        longestWords: [],
-        uniqueWords: [],
-        rankPercentile: 100,
+    dataBaseId = 1,
+    defaultMetrics = {
+        id: dataBaseId,
+        highestScore: 0,
+        averageScore: 0,
+        lowestScore: 0,
+        worstRank: { rank: 0, totalPlayers: 0 },
+        bestRank: { rank: 0, totalPlayers: 0 },
+        mostGameWords: 0,
         averageWordPoints: 0,
-        words: 0,
-        rank: 0
+        averageGamePoints: 0,
+        averageGameWords: 0,
+        averageWordLength: 0,
+        averageRankPercentile: 0,
+        uniqueWords: [],
+        longestWords: [],
+        wordsCount: 0,
+        gamesPlayed: 0
     };
 
 setInterval(function _gameMonitor() {
@@ -61,10 +61,10 @@ setInterval(function _gameMonitor() {
     }
     //If the start time hasn't been set yet, then this is the first tick of the timer...
     //thus, regardless of weather the start time meets the minimum amount or not, there's no
-    //need to do this work until atleast the next tick.
+    //need to do this work until at least the next tick.
     else {
         if (timerSpan = document.getElementById('ext-gen233')) {
-            //if  the timerSpan shows 'Time left:' then wer're still in the middle of a game
+            //if  the timerSpan shows 'Time left:' then we're still in the middle of a game
             if (~timerSpan.innerText.indexOf('Time left:')) {
                 recordedMetrics = false;
                 return;
@@ -137,25 +137,32 @@ function computeMetrics(words, uniques, ranking) {
 
     words.map(word => word.points).forEach(point => totalPoints += point);
 
-    return Object.create(boggleMetrics, {
-        score: { value: totalPoints },
-        wordsCount: { value: words.length },
-        longestWords: { value: words.filter(w => w.word.length === longest).map(w => w.word) },
-        rankings: { value: ranking },
-        rankPercentile: { value: ranking.rank / ranking.totalPlayers },
-        averageWordPoints: { value: totalPoints / words.length },
-        words: { value: words.map(word => word.word) },
-        charCount: { value: totalChars },
-        uniqueWords: { value: uniques }
-    });
+    return {
+        score: totalPoints,
+        wordsCount: words.length,
+        longestWords: words.filter(w => w.word.length === longest).map(w => w.word),
+        rankings: ranking,
+        rankPercentile: ranking.rank / ranking.totalPlayers,
+        averageWordPoints: totalPoints / words.length,
+        words: words.map(w => w.word),
+        charCount: totalChars,
+        uniqueWords: uniques,
+        id: dataBaseId
+    };
 }
 
 function saveGameMetrics(metrics) {
     if (metrics.words.length) {
         let db = window.indexedDB.open("boggle_metrics", version);
         db.onupgradeneeded = function _onUpgradeNeeded(event) {
-            // Create an objectStore for this database
-            event.target.result.createObjectStore("boggle_metrics", { keyPath: 'id', autoIncrement: false });
+            //delete the existing database if present...
+            try {
+                event.target.result.deleteObjectStore('boggle_metrics');
+            }
+            finally {
+                //...then create a new database for the new version
+                event.target.result.createObjectStore("boggle_metrics", { keyPath: 'id', autoIncrement: false });
+            }
         };
 
         db.onsuccess = function _dbOpenSuccess(evt) {
@@ -174,7 +181,7 @@ function saveGameMetrics(metrics) {
 
                         if (metrics.rankings.rank > data.worstRank.rank) data.worstRank = metrics.rankings;
                         else if (metrics.rankings.rank === data.worstRank.rank) {
-                            if (metric.rankings.totalPlayers < data.worstRank.totalPlayers) data.worstRank = metrics.worstRank;
+                            if (metrics.rankings.totalPlayers < data.worstRank.totalPlayers) data.worstRank = metrics.worstRank;
                         }
                         if (metrics.rankings.rank < data.bestRank.rank) data.bestRank = metrics.rankings;
                         else if (metrics.rankings.rank === data.bestRank.rank) {
@@ -237,6 +244,27 @@ function unionWords(currentUniques, newUniques) {
 
 function getGameMetrics(cb) {
     let db = window.indexedDB.open("boggle_metrics", version);
+    db.onupgradeneeded = function _upgradeDatabase(evt) {
+        //delete the existing database if present...
+        let oldData;
+        try {
+            let dbOld = window.indexedDB.open('boggle_metrics', --version);
+            dbOld.onsuccess = function _gatherOldData(evt) {
+                let oldRequest = evt.target.result.transaction(['boggle_metrics']).objectStore('boggle_metrics');
+                oldRequest.onsuccess = function _readOldData(e) {
+                    oldData = e.target.result;
+                };
+            };
+
+            event.target.result.deleteObjectStore('boggle_metrics');
+        }
+        finally {
+            //...then create a new database for the new version
+            event.target.result.createObjectStore("boggle_metrics", { keyPath: 'id', autoIncrement: false });
+        }
+        cb(defaultMetrics);
+    };
+
     db.onsuccess = function _dbOpenSuccess(evt) {
         let store = evt.target.result.transaction(['boggle_metrics'], 'readwrite').objectStore('boggle_metrics'),
             countRequest = store.count();
@@ -245,16 +273,14 @@ function getGameMetrics(cb) {
             if (countRequest.result > 0) {
                 let metricsRequest = store.get(1);
 
-                metricsRequest.onsuccess = function _success(evt) {
-                    cb(evt.target.result);
-                };
-                metricsRequest.onerror = () => cb(null);
+                metricsRequest.onsuccess = evt => cb(evt.target.result);
+                metricsRequest.onerror = () => cb(defaultMetrics);
             }
-            else cb(null);
+            else cb(defaultMetrics);
         };
     };
 
-    db.onerror = () => cb(null);
+    db.onerror = () => cb(defaultMetrics);
 }
 
 chrome.runtime.onMessage.addListener(
