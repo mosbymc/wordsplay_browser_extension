@@ -27,8 +27,6 @@ var version = 1,
         'b5x5': defaultMetrics,
         'b4x4': defaultMetrics
     },
-    bigId = 'b5x5',
-    smallId = 'b4x4',
     b5x5Id = 'b5x5',
     b4x4Id = 'b4x4',
     isBig = true;
@@ -45,7 +43,7 @@ setInterval(function _gameMonitor() {
                 //this game's results and start recording data on the next game
                 if (minGameTime <= time) {
                     startTime = time
-                    isBig = document.getElementById(smallId).classList.contains('x-hide-display');
+                    isBig = document.getElementById(b4x4Id).classList.contains('x-hide-display');
                 }
             }
         }
@@ -165,10 +163,14 @@ function saveGameMetrics(metrics) {
 
             countRequest.onsuccess = function _countRequestSuccess() {
                 if (countRequest.result > 0) {
-                    let metricsRequest = store.get(document.getElementById(b4x4Id).classList.contains('x-hide-display') ? bigId : smallId);
+                    let metricsRequest = store.get(document.getElementById(b4x4Id).classList.contains('x-hide-display') ? b5x5Id : b4x4Id);
 
                     metricsRequest.onsuccess = function _metricsUpdateSuccess(evt) {
                         let data = evt.target.result;
+                        //'onsuccess' event will be fired even if an entry for the request game board metrics does not exist;
+                        //therefore, we have to check that data was actually returned before we start trying to update the value.
+                        //If no data was returned, then there wasn't an entry for the request game board yet, so instead we just create
+                        //a new entry using this game's metrics as the values.
                         if (data) {
                             data.highestScore = metrics.score > data.highestScore ? metrics.score : data.highestScore;
                             data.averageScore = ((data.gamesPlayed * data.averageScore) + metrics.score) / (data.gamesPlayed + 1);
@@ -216,7 +218,7 @@ function saveGameMetrics(metrics) {
 
 function createNewBoardEntry(store, metrics) {
     store.add({
-        id: document.getElementById(b4x4Id).classList.contains('x-hide-display') ? bigId : smallId,//metrics.id,
+        id: document.getElementById(b4x4Id).classList.contains('x-hide-display') ? b5x5Id : b4x4Id,
         highestScore: metrics.score,
         averageScore: metrics.score,
         lowestScore: metrics.score,
