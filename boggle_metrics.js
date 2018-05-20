@@ -1,33 +1,12 @@
-var version = 1;
 window.indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
 
-/**
- * Metrics:
- * - Games Played
- * - Highest Score
- * - Average Score
- * - Lowest Score
- * - Highest Rank
- * - Lowest Rank
- * - Average Rank Percentile
- * - Most Words in a Game
- * - Average Number of Words in a Game
- * - Average Number of Points in a Game
- * - Average Word Length
- * - Average Word Points
- * - Average Words in a Game
- * - Longest Words
- * - Unique Words
- */
-
-var minGameTime = 120000,
+var version = 1,
+    minGameTime = 120000,
     minGameWords = 1,
     startTime = -1,
     recordedMetrics = false,
     computing = false,
-    dataBaseId = 1,
     defaultMetrics = {
-        id: dataBaseId,
         highestScore: 0,
         averageScore: 0,
         lowestScore: 0,
@@ -43,7 +22,16 @@ var minGameTime = 120000,
         longestWords: [],
         wordsCount: 0,
         gamesPlayed: 0
-    };
+    },
+    defaultMetricsResponse = {
+        'b5x5': defaultMetrics,
+        'b4x4': defaultMetrics
+    },
+    bigId = 'b5x5',
+    smallId = 'b4x4',
+    b5x5Id = 'b5x5',
+    b4x4Id = 'b4x4',
+    isBig = true;
 
 setInterval(function _gameMonitor() {
     let timerSpan;
@@ -55,7 +43,10 @@ setInterval(function _gameMonitor() {
                 //If the minGameTime is not equal to or less than the current time remaining,
                 //then don't bother setting the 'startTime' variable - we'll just skip including
                 //this game's results and start recording data on the next game
-                if (minGameTime <= time) startTime = time
+                if (minGameTime <= time) {
+                    startTime = time
+                    isBig = document.getElementById(smallId).classList.contains('x-hide-display');
+                }
             }
         }
     }
@@ -66,6 +57,17 @@ setInterval(function _gameMonitor() {
         if (timerSpan = document.getElementById('ext-gen233')) {
             //if  the timerSpan shows 'Time left:' then we're still in the middle of a game
             if (~timerSpan.innerText.indexOf('Time left:')) {
+                //If the start time was recorded for a big board, but the game was changed to the small board before finishing,
+                //the reset the start time to be recorded on the next tick and update the 'isBig' flag...
+                if (isBig && document.getElementById(b5x5Id).classList.contains('x-hide-display')) {
+                    startTime = -1;
+                    isBig = false;
+                }
+                //...do the same thing if the game started out as a small board and is now a big board
+                else if (!isBig && document.getElementById(b4x4Id).classList.contains('x-hide-display')) {
+                    startTime = -1;
+                    isBig = true;
+                }
                 recordedMetrics = false;
                 return;
             }
@@ -146,8 +148,7 @@ function computeMetrics(words, uniques, ranking) {
         averageWordPoints: totalPoints / words.length,
         words: words.map(w => w.word),
         charCount: totalChars,
-        uniqueWords: uniques,
-        id: dataBaseId
+        uniqueWords: uniques
     };
 }
 
@@ -155,14 +156,7 @@ function saveGameMetrics(metrics) {
     if (metrics.words.length) {
         let db = window.indexedDB.open("boggle_metrics", version);
         db.onupgradeneeded = function _onUpgradeNeeded(event) {
-            //delete the existing database if present...
-            try {
-                event.target.result.deleteObjectStore('boggle_metrics');
-            }
-            finally {
-                //...then create a new database for the new version
-                event.target.result.createObjectStore("boggle_metrics", { keyPath: 'id', autoIncrement: false });
-            }
+            event.target.result.createObjectStore("boggle_metrics", { keyPath: 'id', autoIncrement: false });
         };
 
         db.onsuccess = function _dbOpenSuccess(evt) {
@@ -171,67 +165,74 @@ function saveGameMetrics(metrics) {
 
             countRequest.onsuccess = function _countRequestSuccess() {
                 if (countRequest.result > 0) {
-                    let metricsRequest = store.get(1);
+                    let metricsRequest = store.get(document.getElementById(b4x4Id).classList.contains('x-hide-display') ? bigId : smallId);
 
                     metricsRequest.onsuccess = function _metricsUpdateSuccess(evt) {
                         let data = evt.target.result;
-                        data.highestScore = metrics.score > data.highestScore ? metrics.score : data.highestScore;
-                        data.averageScore = ((data.gamesPlayed * data.averageScore) + metrics.score) / (data.gamesPlayed + 1);
-                        data.lowestScore = metrics.score < data.lowestScore ? metrics.score : data.lowestScore;
+                        if (data) {
+                            data.highestScore = metrics.score > data.highestScore ? metrics.score : data.highestScore;
+                            data.averageScore = ((data.gamesPlayed * data.averageScore) + metrics.score) / (data.gamesPlayed + 1);
+                            data.lowestScore = metrics.score < data.lowestScore ? metrics.score : data.lowestScore;
 
-                        if (metrics.rankings.rank > data.worstRank.rank) data.worstRank = metrics.rankings;
-                        else if (metrics.rankings.rank === data.worstRank.rank) {
-                            if (metrics.rankings.totalPlayers < data.worstRank.totalPlayers) data.worstRank = metrics.worstRank;
+                            if (metrics.rankings.rank > data.worstRank.rank) data.worstRank = metrics.rankings;
+                            else if (metrics.rankings.rank === data.worstRank.rank) {
+                                if (metrics.rankings.totalPlayers < data.worstRank.totalPlayers) data.worstRank = metrics.worstRank;
+                            }
+                            if (metrics.rankings.rank < data.bestRank.rank) data.bestRank = metrics.rankings;
+                            else if (metrics.rankings.rank === data.bestRank.rank) {
+                                if (metrics.rankings.totalPlayers > data.bestRank.totalPlayers) data.bestRank = metrics.rankings;
+                            }
+
+                            data.mostGameWords = metrics.words.length > data.mostGameWords ? metrics.words.length : data.mostGameWords;
+                            data.averageWordPoints = ((data.wordsCount * data.averageWordPoints) + metrics.score) / (data.wordsCount + metrics.words.length);
+                            data.averageGamePoints = ((data.wordsCount + metrics.words.length) * data.averageWordPoints) / (data.gamesPlayed + 1);
+                            data.averageGameWords = (data.wordsCount + metrics.words.length) / (data.gamesPlayed + 1);
+
+                            data.averageRankPercentile = ((data.gamesPlayed * data.averageRankPercentile) + metrics.rankPercentile) / (data.gamesPlayed + 1);
+                            data.averageWordLength = ((data.averageWordLength * data.wordsCount) + metrics.charCount) / (data.wordsCount + metrics.words.length);
+                            data.uniqueWords = unionWords(data.uniqueWords, metrics.uniqueWords);
+
+                            if (metrics.longestWords[0].length > data.longestWords[0].length) data.longestWords = metrics.longestWords;
+                            else if (metrics.longestWords[0].length === data.longestWords[0].length) data.longestWords = unionWords(data.longestWords, metrics.longestWords);
+
+                            data.gamesPlayed += 1;
+                            data.wordsCount = data.wordsCount + metrics.words.length;
+                            store.put(data);
                         }
-                        if (metrics.rankings.rank < data.bestRank.rank) data.bestRank = metrics.rankings;
-                        else if (metrics.rankings.rank === data.bestRank.rank) {
-                            if (metrics.rankings.totalPlayers > data.bestRank.totalPlayers) data.bestRank = metrics.rankings;
-                        }
-
-                        data.mostGameWords = metrics.words.length > data.mostGameWords ? metrics.words.length : data.mostGameWords;
-                        data.averageWordPoints = ((data.wordsCount * data.averageWordPoints) + metrics.score) / (data.wordsCount + metrics.words.length);
-                        data.averageGamePoints = ((data.wordsCount + metrics.words.length) * data.averageWordPoints) / (data.gamesPlayed + 1);
-                        data.averageGameWords = (data.wordsCount + metrics.words.length) / (data.gamesPlayed + 1);
-
-                        data.averageRankPercentile = ((data.gamesPlayed * data.averageRankPercentile) + metrics.rankPercentile) / (data.gamesPlayed + 1);
-                        data.averageWordLength = ((data.averageWordLength * data.wordsCount) + metrics.charCount) / (data.wordsCount + metrics.words.length);
-                        data.uniqueWords = unionWords(data.uniqueWords, metrics.uniqueWords);
-
-                        if (metrics.longestWords[0].length > data.longestWords[0].length) data.longestWords = metrics.longestWords;
-                        else if (metrics.longestWords[0].length === data.longestWords[0].length) data.longestWords = unionWords(data.longestWords, metrics.longestWords);
-
-                        data.gamesPlayed += 1;
-                        data.wordsCount = data.wordsCount + metrics.words.length;
-                        store.put(data);
+                        else createNewBoardEntry(store, metrics);
                     };
 
                     metricsRequest.onerror = err => console.error('Unable to retrieve existing boggle metrics: ', err);
                 }
                 else {
-                    store.add({
-                        id: metrics.id,
-                        highestScore: metrics.score,
-                        averageScore: metrics.score,
-                        lowestScore: metrics.score,
-                        worstRank: metrics.rankings,
-                        bestRank: metrics.rankings,
-                        mostGameWords: metrics.words.length,
-                        averageWordPoints: metrics.averageWordPoints,
-                        averageGamePoints: metrics.score,
-                        averageGameWords: metrics.words.length,
-                        averageWordLength: metrics.charCount / metrics.words.length,
-                        averageRankPercentile: metrics.rankPercentile,
-                        uniqueWords: metrics.uniqueWords,
-                        longestWords: metrics.longestWords,
-                        wordsCount: metrics.words.length,
-                        gamesPlayed: 1
-                    });
+                    createNewBoardEntry(store, metrics);
                 }
             };
         };
 
         db.onerror = err => console.error('Unable to access IndexedDB: ', err);
     }
+}
+
+function createNewBoardEntry(store, metrics) {
+    store.add({
+        id: document.getElementById(b4x4Id).classList.contains('x-hide-display') ? bigId : smallId,//metrics.id,
+        highestScore: metrics.score,
+        averageScore: metrics.score,
+        lowestScore: metrics.score,
+        worstRank: metrics.rankings,
+        bestRank: metrics.rankings,
+        mostGameWords: metrics.words.length,
+        averageWordPoints: metrics.averageWordPoints,
+        averageGamePoints: metrics.score,
+        averageGameWords: metrics.words.length,
+        averageWordLength: metrics.charCount / metrics.words.length,
+        averageRankPercentile: metrics.rankPercentile,
+        uniqueWords: metrics.uniqueWords,
+        longestWords: metrics.longestWords,
+        wordsCount: metrics.words.length,
+        gamesPlayed: 1
+    });
 }
 
 function unionWords(currentUniques, newUniques) {
@@ -244,43 +245,32 @@ function unionWords(currentUniques, newUniques) {
 
 function getGameMetrics(cb) {
     let db = window.indexedDB.open("boggle_metrics", version);
-    db.onupgradeneeded = function _upgradeDatabase(evt) {
-        //delete the existing database if present...
-        let oldData;
-        try {
-            let dbOld = window.indexedDB.open('boggle_metrics', --version);
-            dbOld.onsuccess = function _gatherOldData(evt) {
-                let oldRequest = evt.target.result.transaction(['boggle_metrics']).objectStore('boggle_metrics');
-                oldRequest.onsuccess = function _readOldData(e) {
-                    oldData = e.target.result;
-                };
-            };
-
-            event.target.result.deleteObjectStore('boggle_metrics');
-        }
-        finally {
-            //...then create a new database for the new version
-            event.target.result.createObjectStore("boggle_metrics", { keyPath: 'id', autoIncrement: false });
-        }
-        cb(defaultMetrics);
-    };
-
     db.onsuccess = function _dbOpenSuccess(evt) {
-        let store = evt.target.result.transaction(['boggle_metrics'], 'readwrite').objectStore('boggle_metrics'),
+        let store = evt.target.result.transaction('boggle_metrics').objectStore('boggle_metrics'),
             countRequest = store.count();
 
         countRequest.onsuccess = function _countRequestSuccess() {
-            if (countRequest.result > 0) {
-                let metricsRequest = store.get(1);
-
-                metricsRequest.onsuccess = evt => cb(evt.target.result);
-                metricsRequest.onerror = () => cb(defaultMetrics);
+            if (0 < countRequest.result) {
+                let data = {};
+                store.openCursor().onsuccess = function _cursorSuccess(e) {
+                    var cursor = e.target.result;
+                    if (cursor) {
+                        data[cursor.value.id] = cursor.value;
+                        cursor.continue();
+                    }
+                    else {
+                        if (!('b5x5' in data)) data['b5x5'] = defaultMetrics;
+                        if (!('b4x4' in data)) data['b4x4'] = defaultMetrics;
+                        cb(data);
+                    }
+                };
             }
-            else cb(defaultMetrics);
+
+            else cb(defaultMetricsResponse);
         };
     };
 
-    db.onerror = () => cb(defaultMetrics);
+    db.onerror = () => cb(defaultMetricsResponse);
 }
 
 chrome.runtime.onMessage.addListener(

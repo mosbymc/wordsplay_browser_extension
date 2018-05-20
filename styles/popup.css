@@ -1,28 +1,37 @@
 body {
     width: 600px;
     margin-left: 25px;
+    font-weight: bold;
 }
 
-.metrics_div {
+#b5x5 {
+    margin-top: 10px;
+    margin-bottom: 25px;
+    border: 1px solid black;
+    border-radius: 5px;
+    padding: 10px;
+}
+
+#b4x4 {
+    border: 1px solid black;
+    border-radius: 5px;
+    padding: 10px;
+}
+
+.metric {
     width: auto;
     margin: 10px;
     font-size: 16px;
 }
 
-.title_span {
-    font-weight: bold;
-}
-
 #title {
-    font-size: 20px;
-    font-weight: bold;
+    font-size: 22px;
     width: auto;
     margin: auto;
 }
 
 .group_span {
     font-size: 18px;
-    font-weight: bold;
 }
 
 .group {
@@ -36,4 +45,9 @@ body {
 
 .outer {
     margin-left: 2px !important;
+    margin-bottom: 0 !important;
+}
+
+.board_title {
+    font-size: 20px;
 }
