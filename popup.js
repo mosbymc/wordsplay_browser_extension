@@ -1,12 +1,12 @@
-var identity = val => val;
-var threeDecimals = val => Number.isInteger(val) ? val : val.toFixed(3);
+var identity = val => val,
+    threeDecimals = val => Number.parseFloat(val.toFixed(3)),
+    percentize = val => Number.parseFloat(((1 - val) * 100).toFixed(3)) + '%';
 
 var metricsDesc = {
         highestScore: 'Highest Score: ',
         averageScore: 'Average Score: ',
-        lowestScore: 'Lowest Score: ',
-        worstRank: 'Worst Rank: ',
         bestRank: 'Best Rank: ',
+        bestRankPercentile: 'Best Rank Percentile: ',
         averageRankPercentile: 'Average Rank Percentile: ',
         mostGameWords: 'Most Words In A Game: ',
         averageWordPoints: 'Average Points Per Words: ',
@@ -19,8 +19,8 @@ var metricsDesc = {
     metricsModifier = {
         highestScore: identity,
         averageScore: threeDecimals,
-        lowestScore: identity,
-        averageRankPercentile: threeDecimals,
+        bestRankPercentile: percentize,
+        averageRankPercentile: percentize,
         mostGameWords: identity,
         averageWordPoints: threeDecimals,
         averageGameWords: threeDecimals,
@@ -36,42 +36,40 @@ function getMetrics(cb) {
     });
 }
 
+function createAndAppendTitleSpan(metricId, div) {
+    let titleSpan = document.createElement('span');
+    titleSpan.classList.add('title_span');
+    titleSpan.innerText = metricsDesc[metricId];
+    div.appendChild(titleSpan);
+}
+
 getMetrics(function _metricsCallback(metrics) {
-    for (let boardId in metrics) {
+    Object.keys(metrics).forEach(boardId => {
         let board = document.getElementById(boardId);
         Array.from(board.querySelectorAll('.metric'))
-            .forEach(function _addMetricToBoard(div) {
+            .forEach(div => {
                 let metricId = Array.from(div.classList).filter(c => c in metricsDesc)[0];
                 if (metricId) {
                     if ('longestWords' !== metricId && 'uniqueWords' !== metricId) {
-                        let titleSpan = document.createElement('span');
-                        titleSpan.classList.add('title_span');
-                        titleSpan.innerText = metricsDesc[metricId];
-
+                        createAndAppendTitleSpan(metricId, div);
                         let contentSpan = document.createElement('span');
                         contentSpan.classList.add('content_span');
 
-                        if ('worstRank' !== metricId && 'bestRank' !== metricId) contentSpan.innerText = metricsModifier[metricId](metrics[boardId][metricId]);
-                        else contentSpan.innerText = metrics[boardId][metricId].rank + ' / ' + metrics[boardId][metricId].totalPlayers;
+                        if ('bestRank' !== metricId) contentSpan.innerText = metricsModifier[metricId](metrics[boardId][metricId]);
+                        else contentSpan.innerText = `${metrics[boardId][metricId].rank} / ${metrics[boardId][metricId].totalPlayers}`;
 
-                        div.appendChild(titleSpan);
                         div.appendChild(contentSpan);
                     }
                     else {
-                        let descSpan = document.createElement('span');
-                        descSpan.classList.add('title_span');
-                        descSpan.innerText = metricsDesc[metricId];
-                        div.appendChild(descSpan);
-
+                        createAndAppendTitleSpan(metricId, div);
                         metrics[boardId][metricId].forEach(function _createWordSpans(word, idx) {
                             let span = document.createElement('span');
                             span.classList.add('content_span');
-                            let comma = idx === metrics[boardId][metricId].length - 1 ? '' : ', ';
-                            span.innerText = word + comma;
+                            span.innerText = `${word}${idx === metrics[boardId][metricId].length - 1 ? '' : ', '}`;
                             div.appendChild(span);
                         });
                     }
                 }
             });
-    }
+    });
 });

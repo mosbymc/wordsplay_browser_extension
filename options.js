@@ -16,16 +16,14 @@ function getStorageValues() {
     });
 }
 
-function setStorageValues() {
-    let time = document.getElementById('min_time').value,
-        words = document.getElementById('min_words').value;
-
-    if (maxMinTime < time) return;
-    chrome.storage.set({ min_time: time }, noop);
-    chrome.storage.set({ min_words: words }, noop);
-}
-
 getStorageValues();
+
+function createErrorSpan(spanId) {
+    let span = document.createElement('span');
+    span.id = spanId;
+    span.classList.add('error');
+    return span;
+}
 
 document.getElementById('min_time').addEventListener('input', function _minTimeHandler(e) {
     let val = Number.parseInt(e.target.value);
@@ -34,23 +32,16 @@ document.getElementById('min_time').addEventListener('input', function _minTimeH
         if (errorSpan) document.getElementById('time').removeChild(errorSpan);
         chrome.storage.sync.set({ min_time: val }, noop);
     }
-    else if (!document.getElementById('time_error')) {
-        let errorSpan = document.createElement('span');
-        errorSpan.id = 'time_error';
-        errorSpan.classList.add('error');
-
-        if (Number.isNaN(val)) errorSpan.innerText = 'The value entered is not a number. Please enter a number or the previously saved value will be used instead.';
-        else if (175 < val) errorSpan.innerText = 'The value entered is too high. Please enter a number less than 176 seconds.';
-        else errorSpan.innerText = 'The minimum time value cannot be less than zero. Please enter a larger number.';
-
-        document.getElementById('time').appendChild(errorSpan);
-    }
     else {
-        let errorSpan = document.getElementById('time_error');
+        let errorSpan,
+            found;
+        if (!(found = errorSpan = document.getElementById('time_error'))) errorSpan = createErrorSpan('time_error');
 
         if (Number.isNaN(val)) errorSpan.innerText = 'The value entered is not a number. Please enter a number or the previously saved value will be used instead.';
         else if (175 < val) errorSpan.innerText = 'The value entered is too high. Please enter a number less than 176 seconds.';
         else errorSpan.innerText = 'The minimum time value cannot be less than zero. Please enter a larger number.';
+
+        if (!found) document.getElementById('time').appendChild(errorSpan);
     }
 });
 
@@ -61,19 +52,13 @@ document.getElementById('min_words').addEventListener('input', function _minWord
         if (errorSpan) document.getElementById('words').removeChild(errorSpan);
         chrome.storage.sync.set({ min_words: val }, noop);
     }
-    else if (!document.getElementById('word_error')) {
-        let errorSpan = document.createElement('span');
-        errorSpan.id = 'word_error';
-        errorSpan.classList.add('error');
-
-        if (Number.isNaN(val)) errorSpan.innerText = 'The value entered is not a number. Please enter a number or the previously saved value will be used instead.';
-        else errorSpan.innerText = 'The minimum words value cannot be less than one. Please enter a larger number.';
-
-        document.getElementById('words').appendChild(errorSpan);
-    }
     else {
-        let errorSpan = document.getElementById('word_error');
+        let errorSpan, found;
+        if (!(found = errorSpan = document.getElementById('word_error'))) errorSpan = createErrorSpan('word_error');
+
         if (Number.isNaN(val)) errorSpan.innerText = 'The value entered is not a number. Please enter a number or the previously saved value will be used instead.';
         else errorSpan.innerText = 'The minimum words value cannot be less than one. Please enter a larger number.';
+
+        if (!found) document.getElementById('words').appendChild(errorSpan);
     }
 });

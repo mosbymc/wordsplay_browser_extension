@@ -9,14 +9,13 @@ var version = 1,
     defaultMetrics = {
         highestScore: 0,
         averageScore: 0,
-        lowestScore: 0,
-        worstRank: { rank: 0, totalPlayers: 0 },
         bestRank: { rank: 0, totalPlayers: 0 },
         mostGameWords: 0,
         averageWordPoints: 0,
         averageGamePoints: 0,
         averageGameWords: 0,
         averageWordLength: 0,
+        bestRankPercentile: 1,
         averageRankPercentile: 0,
         uniqueWords: [],
         longestWords: [],
@@ -112,7 +111,7 @@ function getGameRank() {
             totalPlayers: Number.parseInt(totalPlayers[totalPlayers.length - 1].querySelectorAll('.x-grid3-cell-inner')[0].innerText)
         };
     }
-        //If the player guess no words, then there is no span with a 'me' class, so the attempt to get the innerText will throw.
+        //If the player guessed no words, then there is no span with a 'me' class, so the attempt to get the innerText will throw.
         //Since we don't record games with no points anyway, we just return a dummy object here - it won't be recorded
     catch(e) {
         return { rank: 0, totalPlayers: 0 };
@@ -152,13 +151,13 @@ function computeMetrics(words, uniques, ranking) {
 
 function saveGameMetrics(metrics) {
     if (metrics.words.length) {
-        let db = window.indexedDB.open("boggle_metrics", version);
+        let db = window.indexedDB.open('wordsplay_metrics', version);
         db.onupgradeneeded = function _onUpgradeNeeded(event) {
-            event.target.result.createObjectStore("boggle_metrics", { keyPath: 'id', autoIncrement: false });
+            event.target.result.createObjectStore("wordsplay_metrics", { keyPath: 'id', autoIncrement: false });
         };
 
         db.onsuccess = function _dbOpenSuccess(evt) {
-            let store = evt.target.result.transaction(['boggle_metrics'], 'readwrite').objectStore('boggle_metrics'),
+            let store = evt.target.result.transaction(['wordsplay_metrics'], 'readwrite').objectStore('wordsplay_metrics'),
                 countRequest = store.count();
 
             countRequest.onsuccess = function _countRequestSuccess() {
@@ -174,12 +173,7 @@ function saveGameMetrics(metrics) {
                         if (data) {
                             data.highestScore = metrics.score > data.highestScore ? metrics.score : data.highestScore;
                             data.averageScore = ((data.gamesPlayed * data.averageScore) + metrics.score) / (data.gamesPlayed + 1);
-                            data.lowestScore = metrics.score < data.lowestScore ? metrics.score : data.lowestScore;
 
-                            if (metrics.rankings.rank > data.worstRank.rank) data.worstRank = metrics.rankings;
-                            else if (metrics.rankings.rank === data.worstRank.rank) {
-                                if (metrics.rankings.totalPlayers < data.worstRank.totalPlayers) data.worstRank = metrics.worstRank;
-                            }
                             if (metrics.rankings.rank < data.bestRank.rank) data.bestRank = metrics.rankings;
                             else if (metrics.rankings.rank === data.bestRank.rank) {
                                 if (metrics.rankings.totalPlayers > data.bestRank.totalPlayers) data.bestRank = metrics.rankings;
@@ -190,6 +184,7 @@ function saveGameMetrics(metrics) {
                             data.averageGamePoints = ((data.wordsCount + metrics.words.length) * data.averageWordPoints) / (data.gamesPlayed + 1);
                             data.averageGameWords = (data.wordsCount + metrics.words.length) / (data.gamesPlayed + 1);
 
+                            data.bestRankPercentile = metrics.rankPercentile < data.bestRankPercentile ? metrics.rankPercentile : data.bestRankPercentile;
                             data.averageRankPercentile = ((data.gamesPlayed * data.averageRankPercentile) + metrics.rankPercentile) / (data.gamesPlayed + 1);
                             data.averageWordLength = ((data.averageWordLength * data.wordsCount) + metrics.charCount) / (data.wordsCount + metrics.words.length);
                             data.uniqueWords = unionWords(data.uniqueWords, metrics.uniqueWords);
@@ -204,11 +199,9 @@ function saveGameMetrics(metrics) {
                         else createNewBoardEntry(store, metrics);
                     };
 
-                    metricsRequest.onerror = err => console.error('Unable to retrieve existing boggle metrics: ', err);
+                    metricsRequest.onerror = err => console.error('Unable to retrieve existing wordsplay metrics: ', err);
                 }
-                else {
-                    createNewBoardEntry(store, metrics);
-                }
+                else createNewBoardEntry(store, metrics);
             };
         };
 
@@ -221,14 +214,13 @@ function createNewBoardEntry(store, metrics) {
         id: document.getElementById(b4x4Id).classList.contains('x-hide-display') ? b5x5Id : b4x4Id,
         highestScore: metrics.score,
         averageScore: metrics.score,
-        lowestScore: metrics.score,
-        worstRank: metrics.rankings,
         bestRank: metrics.rankings,
         mostGameWords: metrics.words.length,
         averageWordPoints: metrics.averageWordPoints,
         averageGamePoints: metrics.score,
         averageGameWords: metrics.words.length,
         averageWordLength: metrics.charCount / metrics.words.length,
+        bestRankPercentile: metrics.rankPercentile,
         averageRankPercentile: metrics.rankPercentile,
         uniqueWords: metrics.uniqueWords,
         longestWords: metrics.longestWords,
@@ -246,39 +238,34 @@ function unionWords(currentUniques, newUniques) {
 }
 
 function getGameMetrics(cb) {
-    let db = window.indexedDB.open("boggle_metrics", version);
+    let db = window.indexedDB.open('wordsplay_metrics', version);
+
+    db.onupgradeneeded = event => event.target.result.createObjectStore('wordsplay_metrics', { keyPath: 'id', autoIncrement: false });
+    db.onerror = () => cb(defaultMetricsResponse);
+
     db.onsuccess = function _dbOpenSuccess(evt) {
-        let store = evt.target.result.transaction('boggle_metrics').objectStore('boggle_metrics'),
-            countRequest = store.count();
-
-        countRequest.onsuccess = function _countRequestSuccess() {
-            if (0 < countRequest.result) {
-                let data = {};
-                store.openCursor().onsuccess = function _cursorSuccess(e) {
-                    var cursor = e.target.result;
-                    if (cursor) {
-                        data[cursor.value.id] = cursor.value;
-                        cursor.continue();
-                    }
-                    else {
-                        if (!('b5x5' in data)) data['b5x5'] = defaultMetrics;
-                        if (!('b4x4' in data)) data['b4x4'] = defaultMetrics;
-                        cb(data);
-                    }
-                };
+        let store = evt.target.result.transaction('wordsplay_metrics').objectStore('wordsplay_metrics'),
+            data = {};
+        store.openCursor().onsuccess = function _cursorSuccess(e) {
+            var cursor = e.target.result;
+            if (cursor) {
+                data[cursor.value.id] = cursor.value;
+                cursor.continue();
             }
-
-            else cb(defaultMetricsResponse);
+            else {
+                if (!('b5x5' in data)) data['b5x5'] = defaultMetrics;
+                if (!('b4x4' in data)) data['b4x4'] = defaultMetrics;
+                cb(data);
+            }
         };
     };
-
-    db.onerror = () => cb(defaultMetricsResponse);
 }
 
 chrome.runtime.onMessage.addListener(
     function _messageHandler(request, sender, sendResponse) {
         if ('get_metrics' === request.action) {
             getGameMetrics(sendResponse);
+            //must return 'true' here in order for chrome to keep the port open for a response
             return true;
         }
     }
