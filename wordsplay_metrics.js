@@ -1,12 +1,12 @@
 window.indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
 
-var version = 1,
-    minGameTime = 120000,
-    minGameWords = 1,
-    startTime = -1,
-    recordedMetrics = false,
-    computing = false,
-    defaultMetrics = {
+var version = 1,                    //db version number
+    minGameTime = 120000,           //default min game time if not set in google storage from options page
+    minGameWords = 1,               //default min game words if not set in google storage from options page
+    startTime = -1,                 //stores the start time of the current game to be compared to the minGameTime var during recording
+    recordedMetrics = false,        //prevents the game from recording the same metrics more than once
+    computing = false,              //prevents the game from computing the metrics more than once due to the game loop
+    defaultMetrics = {              //default metrics object - used when metrics are requested for the popup if none exist
         highestScore: 0,
         averageScore: 0,
         bestRank: { rank: 0, totalPlayers: 0 },
@@ -22,14 +22,15 @@ var version = 1,
         wordsCount: 0,
         gamesPlayed: 0
     },
-    defaultMetricsResponse = {
-        'b5x5': defaultMetrics,
-        'b4x4': defaultMetrics
-    },
-    b5x5Id = 'b5x5',
-    b4x4Id = 'b4x4',
-    isBig = true;
+    b5x5Id = 'b5x5',                //id for the DOM's 5x5 game board and IDB storage entry
+    b4x4Id = 'b4x4',                //id for the DOM's 4x4 game board and IDB storage entry
+    isBig = true;                   //indicates if the recorded start time was for a small or large board - prevent errors in recording if board size is
+                                    //switched mid-game
 
+function noop() {}
+
+//Metrics loop - fires every 5 seconds to check game start time and record metrics if the minimum time and words have been met
+//and the scores have been posted
 setInterval(function _gameMonitor() {
     let timerSpan;
     if (-1 === startTime) {
@@ -41,7 +42,7 @@ setInterval(function _gameMonitor() {
                 //then don't bother setting the 'startTime' variable - we'll just skip including
                 //this game's results and start recording data on the next game
                 if (minGameTime <= time) {
-                    startTime = time
+                    startTime = time;
                     isBig = document.getElementById(b4x4Id).classList.contains('x-hide-display');
                 }
             }
@@ -69,23 +70,23 @@ setInterval(function _gameMonitor() {
                 return;
             }
 
-            //if the timerSpan shows 'Loading...' then we have to wait for the scores to be displayed before gathering the data
-            if (~timerSpan.innerText.indexOf('Loading...')) return;
-
-            //otherwise, the game has stopped and we can gather the data as long as we haven't already gathered it
+            //If the timerSpan shows 'New game', the game has stopped and we can gather the data as long as we haven't already gathered it
             if (~timerSpan.innerText.indexOf('New game')) {
                 if (!recordedMetrics && startTime - minGameTime >= 0 !== startTime && !computing) {
-                    computing = true;
+                    computing = true;   //set the computing var to 'true', if the computations take more than 5 second (unlikely), then we won't
+                                        //try to record them again while the first is still computing
                     saveGameMetrics(computeMetrics(getGameWords(), getUniqueWords(), getGameRank()));
                     recordedMetrics = true;
-                    startTime = -1;
-                    computing = false;
+                    startTime = -1;     //set the startTime var back to -1 for the next game
+                    computing = false;  //set computing var back to 'false' for the next game
                 }
             }
         }
     }
 }, 5);
 
+//Retrieves the legit words guessed by the player and returns an array of objects that contain
+//a word and its point value
 function getGameWords() {
     let wordDiv = document.getElementById('ext-gen342');
     return wordDiv ? Array.from(wordDiv.querySelectorAll('span'))
@@ -100,6 +101,7 @@ function getGameWords() {
         }) : [];
 }
 
+//Retrieves the player's game rank and the total number of players in the game
 function getGameRank() {
     try {
         let rank = Array.prototype.concat.apply([], Array.from(document.querySelectorAll('.me'))
@@ -118,12 +120,14 @@ function getGameRank() {
     }
 }
 
+//Gets all the unique words guessed by the player during the game
 function getUniqueWords() {
     return Array.from(document.getElementById('ext-gen272')
         .querySelectorAll('.fb_only'))
         .map(div => div.innerText);
 }
 
+//Computes the metric values for the current game and returns a 'metrics' object
 function computeMetrics(words, uniques, ranking) {
     let longest = 0,
         totalPoints = 0,
@@ -149,12 +153,12 @@ function computeMetrics(words, uniques, ranking) {
     };
 }
 
+//Saves the game's metrics
 function saveGameMetrics(metrics) {
     if (metrics.words.length) {
         let db = window.indexedDB.open('wordsplay_metrics', version);
-        db.onupgradeneeded = function _onUpgradeNeeded(event) {
-            event.target.result.createObjectStore("wordsplay_metrics", { keyPath: 'id', autoIncrement: false });
-        };
+        db.onupgradeneeded = event => event.target.result.createObjectStore("wordsplay_metrics", { keyPath: 'id', autoIncrement: false });
+        db.onerror = err => console.error('Unable to access IndexedDB: ', err);
 
         db.onsuccess = function _dbOpenSuccess(evt) {
             let store = evt.target.result.transaction(['wordsplay_metrics'], 'readwrite').objectStore('wordsplay_metrics'),
@@ -204,11 +208,10 @@ function saveGameMetrics(metrics) {
                 else createNewBoardEntry(store, metrics);
             };
         };
-
-        db.onerror = err => console.error('Unable to access IndexedDB: ', err);
     }
 }
 
+//Creates a new entry into the IDB for a 4x4 or 5x5 board if one doesn't already exist
 function createNewBoardEntry(store, metrics) {
     store.add({
         id: document.getElementById(b4x4Id).classList.contains('x-hide-display') ? b5x5Id : b4x4Id,
@@ -229,19 +232,21 @@ function createNewBoardEntry(store, metrics) {
     });
 }
 
-function unionWords(currentUniques, newUniques) {
-    let res = currentUniques;
-    for (let word of newUniques) {
+//Concats the player's current unique/longest words with the IDB's words - leaving out the duplicates
+function unionWords(currentWords, newWords) {
+    let res = currentWords;
+    for (let word of newWords) {
         if (!res.includes(word)) res.push(word);
     }
     return res;
 }
 
+//Retrieves the game metrics when requested by the popup
 function getGameMetrics(cb) {
     let db = window.indexedDB.open('wordsplay_metrics', version);
 
     db.onupgradeneeded = event => event.target.result.createObjectStore('wordsplay_metrics', { keyPath: 'id', autoIncrement: false });
-    db.onerror = () => cb(defaultMetricsResponse);
+    db.onerror = () => cb({ b4x4Id: defaultMetrics, b5x5Id: defaultMetrics });
 
     db.onsuccess = function _dbOpenSuccess(evt) {
         let store = evt.target.result.transaction('wordsplay_metrics').objectStore('wordsplay_metrics'),
@@ -253,8 +258,8 @@ function getGameMetrics(cb) {
                 cursor.continue();
             }
             else {
-                if (!('b5x5' in data)) data['b5x5'] = defaultMetrics;
-                if (!('b4x4' in data)) data['b4x4'] = defaultMetrics;
+                if (!(b5x5Id in data)) data[b5x5Id] = defaultMetrics;
+                if (!(b4x4Id in data)) data[b4x4Id] = defaultMetrics;
                 cb(data);
             }
         };
@@ -271,10 +276,34 @@ chrome.runtime.onMessage.addListener(
     }
 );
 
+//Overrides the minGameTime variable if found in chrome storage
 chrome.storage.sync.get(['min_time'], function _storageRequestCallback(result) {
     minGameTime = result && result.min_time ? result.min_time * 1000 : minGameTime;
 });
 
+//Overrides the minGameWords variable if found in chrome storage
 chrome.storage.sync.get(['min_words'], function _storageRequestCallback(result) {
     minGameWords = result && result.min_words ? result.min_words : minGameWords;
+});
+
+//Clears out the 4x4 game metrics and resets the option to 'false' afterwards
+chrome.storage.sync.get(['clear_4'], function _storageRequestClear4Callback(result) {
+    if (result && result.clear_4) {
+        let db = window.indexedDB.open('wordsplay_metrics', version);
+        db.onupgradeneeded = event => event.target.result.createObjectStore('wordsplay_metrics', { keyPath: 'id', autoIncrement: false });
+        db.onsuccess = event => event.target.result.transaction('wordsplay_metrics', 'readwrite').objectStore('wordsplay_metrics').delete('b4x4');
+
+        chrome.storage.sync.set({ clear_4: false }, noop);
+    }
+});
+
+//Clears out the 5x5 game metrics and resets the option to 'false' afterwards
+chrome.storage.sync.get(['clear_5'], function _storageRequestClear5Callback(result) {
+    if (result && result.clear_5) {
+        let db = window.indexedDB.open('wordsplay_metrics', version);
+        db.onupgradeneeded = event => event.target.result.createObjectStore('wordsplay_metrics', { keyPath: 'id', autoIncrement: false });
+        db.onsuccess = event => event.target.result.transaction('wordsplay_metrics', 'readwrite').objectStore('wordsplay_metrics').delete('b5x5');
+
+        chrome.storage.sync.set({ clear_5: false }, noop);
+    }
 });

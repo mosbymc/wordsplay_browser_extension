@@ -5,7 +5,8 @@
 <body>
 <div id='desc'>
     Set these values to change the minimum game time or words that are required for a single
-    game's metrics to be recorded.
+    game's metrics to be recorded. NOTE: If you already have a tab open to the wordsplay.net
+    site, you must refresh it for these options to take effect.
     <br><br>
     Minimum Game Time:
     The default minimum game time is 120 seconds, which means that
@@ -20,6 +21,12 @@
     <br><br>
     Both minimums are required to be met, not either/or. If the value provided cannot be parsed as an integer,
     or does not meet min/max criteria you will recieve an error message alerting you to the problem.
+    <br><br>
+    Clearing Game Metrics:
+    Checking the checkboxes will clear all data associated with the specified game board size. After clicking
+    submit, you can still come back to this options page and change the value before it takes effect as long as
+    the wordsplay.net site has not been loaded or refreshed since they were changed. However, once the metrics
+    are cleared, they cannot be regained.
 </div>
 <br>
 <div id='options_div'>
@@ -33,10 +40,21 @@
                     Mimimum Words: <input type='text' id='min_words' />
                 </span>
     </div>
+    <br>
+    <div id='reset'>
+                <span>
+                    Clear 5x5 game metrics: <input type='checkbox' id='b5x5'/>
+                </span>
+        <br>
+        <span>
+                    Clear 4x4 game metrics: <input type='checkbox' id='b4x4'/>
+                </span>
+    </div>
+    <br>
+    <button type='button' id='submit'>Submit</button>
 </div>
 <div>
-    When you are done adjusting the values, just close the window. The extension updates the values as you type,
-    so there's no need to explicitly 'save' the values.
+    After submitting the changes, if there are no errors (shown in red boxes), just close the window.
 </div>
 </body>
 <script src='./options.js'></script>

@@ -28,6 +28,7 @@ var metricsDesc = {
         gamesPlayed: identity
     };
 
+//Retrieves the game metrics from wordsplay_metrics.js file
 function getMetrics(cb) {
     chrome.tabs.query({active: true, currentWindow: true}, function _tabs(tabs) {
         chrome.tabs.sendMessage(tabs[0].id, { action: 'get_metrics' }, function _sentMessageCallback(response) {
@@ -36,6 +37,7 @@ function getMetrics(cb) {
     });
 }
 
+//Creates and appends the title span for each metric
 function createAndAppendTitleSpan(metricId, div) {
     let titleSpan = document.createElement('span');
     titleSpan.classList.add('title_span');
@@ -43,6 +45,7 @@ function createAndAppendTitleSpan(metricId, div) {
     div.appendChild(titleSpan);
 }
 
+//Initiates the metric retrieval and provides a callback that displays the metrics
 getMetrics(function _metricsCallback(metrics) {
     Object.keys(metrics).forEach(boardId => {
         let board = document.getElementById(boardId);
