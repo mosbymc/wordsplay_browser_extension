@@ -28,7 +28,7 @@ var metricsDesc = {
         gamesPlayed: identity
     };
 
-//Retrieves the game metrics from wordsplay_metrics.js file
+//Retrieves the game metrics from content.js file
 function getMetrics(cb) {
     chrome.tabs.query({active: true, currentWindow: true}, function _tabs(tabs) {
         chrome.tabs.sendMessage(tabs[0].id, { action: 'get_metrics' }, function _sentMessageCallback(response) {
