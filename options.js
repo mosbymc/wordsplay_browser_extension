@@ -1,4 +1,5 @@
-var defaultMinTime = 120,
+var extension = 'undefined' !== typeof chrome && chrome.storage ? chrome : browser,
+    defaultMinTime = 120,
     defaultMinWords = 1,
     maxMinTime = 176;
 
@@ -6,20 +7,20 @@ function noop() {}
 
 //Gets the values currently in storage and displays them in the various inputs
 function getStorageValues() {
-    chrome.storage.sync.get(['min_time'], function _storageRequestCallback(result) {
+    extension.storage.sync.get(['min_time'], function _storageRequestCallback(result) {
         document.getElementById('min_time').value = result && result.min_time ? result.min_time : defaultMinTime;
     });
 
-    chrome.storage.sync.get(['min_words'], function _storageRequestCallback(result) {
+    extension.storage.sync.get(['min_words'], function _storageRequestCallback(result) {
         document.getElementById('min_words').value = result && result.min_words ? result.min_words : defaultMinWords;
     });
 
-    chrome.storage.sync.get(['clear_4'], function _storageRequestClear4Callback(result) {
+    extension.storage.sync.get(['clear_4'], function _storageRequestClear4Callback(result) {
         let clear4 = result.clear_4;
         if (true === clear4 || false === clear4) document.getElementById('b4x4').checked = clear4;
     });
 
-    chrome.storage.sync.get(['clear_5'], function _storageRequestClear5Callback(result) {
+    extension.storage.sync.get(['clear_5'], function _storageRequestClear5Callback(result) {
         let clear5 = result.clear_5;
         if (true === clear5 || false === clear5) document.getElementById('b5x5').checked = clear5;
     });
@@ -83,9 +84,9 @@ document.getElementById('submit').addEventListener('click', function _submitOpti
         let timeVal = Number.parseInt(document.getElementById('min_time').value),
             wordVal = Number.parseInt(document.getElementById('min_words').value);
 
-        chrome.storage.sync.set({ min_time: timeVal }, noop);
-        chrome.storage.sync.set({ min_words: wordVal }, noop);
-        chrome.storage.sync.set({ clear_4: document.getElementById('b4x4').checked }, noop);
-        chrome.storage.sync.set({ clear_5: document.getElementById('b5x5').checked }, noop);
+        extension.storage.sync.set({ min_time: timeVal }, noop);
+        extension.storage.sync.set({ min_words: wordVal }, noop);
+        extension.storage.sync.set({ clear_4: document.getElementById('b4x4').checked }, noop);
+        extension.storage.sync.set({ clear_5: document.getElementById('b5x5').checked }, noop);
     }
 });

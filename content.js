@@ -1,5 +1,17 @@
 window.indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
 
+var extension;  //save the vendor-specific extension namespace to a variable so this extension can be cross platform
+
+try {
+    //For some reason, both Edge and Chrome will throw when testing like so: 'chrome && chrome.runtime...' if
+    //the variable does not exist within scope. I've never seen behavior like this before and according to spec
+    //it shouldn't throw. So instead I am using 'typeof' as a workaround to prevent the exception
+    extension = 'undefined' !== typeof chrome && chrome.runtime ? chrome : browser;
+}
+catch(e) {
+    console.log('Unable to record metrics: Vendor specific extension namespace unknown.');
+}
+
 var version = 1,                    //db version number
     minGameTime = 120000,           //default min game time if not set in google storage from options page
     minGameWords = 1,               //default min game words if not set in google storage from options page
@@ -19,6 +31,14 @@ var version = 1,                    //db version number
         averageRankPercentile: 1,
         uniqueWords: [],
         longestWords: [],
+        teamBestRank: { rank: 0, teamCount: 0, totalPlayers: 0 },
+        teamBestRankPercentile: 1,
+        teamAverageRankPercentile: 1,
+        teamHighestScore: 0,
+        teamAverageScore: 0,
+        teamAverageScorePerPlayer: 0,
+        teamAverageScoreContributionPercent: 0,
+        teamGamesPlayed: 0,
         wordsCount: 0,
         gamesPlayed: 0
     },
@@ -75,7 +95,7 @@ setInterval(function _gameMonitor() {
                 if (!recordedMetrics && startTime - minGameTime >= 0 !== startTime && !computing) {
                     computing = true;   //set the computing var to 'true', if the computations take more than 5 second (unlikely), then we won't
                                         //try to record them again while the first is still computing
-                    saveGameMetrics(computeMetrics(getGameWords(), getUniqueWords(), getGameRank()));
+                    saveGameMetrics(computeMetrics(getGameWords(), getUniqueWords(), getGameRank(), getTeamMetrics()));
                     recordedMetrics = true;
                     startTime = -1;     //set the startTime var back to -1 for the next game
                     computing = false;  //set computing var back to 'false' for the next game
@@ -127,8 +147,38 @@ function getUniqueWords() {
         .map(div => div.innerText);
 }
 
+function getTeamMetrics() {
+    try {
+        let names = document.querySelectorAll('.me')[0].querySelectorAll('.x-grid3-col-name')[0].innerText.trim().split(':');
+
+        if (1 < names.length) {
+            let teamName = names[0],
+                playerName = names[1],
+                recordedTeam = false,
+                teamRank, teamScore, teamCount = 0;
+
+            Array.from(document.getElementById('ext-gen493').querySelectorAll('.x-grid3-col-name'))
+                .forEach(function _findTeam(playerDiv) {
+                    if (playerDiv.innerText.includes(teamName) && !playerDiv.innerText.includes(playerName) && !recordedTeam) {
+                        teamRank = Number.parseInt(playerDiv.parentElement.parentElement.querySelectorAll('.x-grid3-cell-inner')[0].innerText);
+                        teamScore = Number.parseInt(playerDiv.parentElement.parentElement.querySelectorAll('.x-grid3-cell-last')[0].innerText);
+                        recordedTeam = true;
+                    }
+                    else if (playerDiv.innerText.includes(teamName)) teamCount++;
+                });
+
+            if (teamRank) return { rank: teamRank, score: teamScore, teamCount: teamCount };
+            else return { rank: 0, score: 0, teamCount: 0 };
+        }
+        else return { rank: 0, score: 0, teamCount: 0 };
+    }
+    catch(e) {
+        return { rank: 0, score: 0, teamCount: 0 };
+    }
+}
+
 //Computes the metric values for the current game and returns a 'metrics' object
-function computeMetrics(words, uniques, ranking) {
+function computeMetrics(words, uniques, ranking, teamMetrics) {
     let longest = 0,
         totalPoints = 0,
         totalChars = 0;
@@ -149,7 +199,11 @@ function computeMetrics(words, uniques, ranking) {
         averageWordPoints: totalPoints / words.length,
         words: words.map(w => w.word),
         charCount: totalChars,
-        uniqueWords: uniques
+        uniqueWords: uniques,
+        hasTeam: 1 < teamMetrics.teamCount,
+        teamScore: teamMetrics.score,
+        teamRank: { rank: teamMetrics.rank, teamCount: teamMetrics.teamCount, totalPlayers: ranking.totalPlayers },
+        teamRankPercentile: teamMetrics.rank / ranking.totalPlayers
     };
 }
 
@@ -198,6 +252,47 @@ function saveGameMetrics(metrics) {
 
                             data.gamesPlayed += 1;
                             data.wordsCount = data.wordsCount + metrics.words.length;
+
+                            if (metrics.hasTeam && data.teamGamesPlayed) {
+                                if (metrics.teamRank.rank < data.teamBestRank) data.teamBestRank = metrics.teamRank;
+                                else if (metrics.teamRank.rank === data.teamBestRank.rank && metrics.totalPlayers > data.teamBestRank.totalPlayers)
+                                    data.teamBestRank = metrics.teamRank;
+
+                                data.teamBestRankPercentile = metrics.teamRankPercentile < data.teamBestRankPercentile ?
+                                    metrics.teamRankPercentile : data.teamBestRankPercentile;
+                                data.teamAverageRankPercentile = ((data.teamGamesPlayed * data.teamAverageRankPercentile) + metrics.teamRankPercentile)
+                                    / (data.teamGamesPlayed + 1);
+                                data.teamHighestScore = metrics.teamScore > data.teamHighestScore ? metrics.teamScore : data.teamHighestScore;
+                                data.teamAverageScore = ((data.teamGamesPlayed * data.teamAverageScore) + metrics.teamScore) / (data.teamGamesPlayed + 1);
+                                data.teamAveragePlayers = ((data.teamGamesPlayed * data.teamAveragePlayers) + metrics.teamRank.teamCount) / (data.teamGamesPlayed + 1);
+                                data.teamAverageScorePerPlayer = data.teamAverageScore / data.teamAveragePlayers;
+                                data.teamAverageScoreContributionPercent = ((data.teamGamesPlayed * data.teamAverageScoreContributionPercent)
+                                    + (metrics.score / metrics.teamScore)) / data.gamesPlayed + 1;
+                                data.teamGamesPlayed++;
+                            }
+                            else if (metrics.hasTeam) {
+                                data.teamBestRank = metrics.teamRank;
+                                data.teamBestRankPercentile = metrics.teamRankPercentile;
+                                data.teamAverageRankPercentile = metrics.teamRankPercentile;
+                                data.teamHighestScore = metrics.teamScore;
+                                data.teamAverageScore = metrics.teamScore;
+                                data.teamAveragePlayers = metrics.teamRank.teamCount;
+                                data.teamAverageScorePerPlayer = metrics.teamScore / metrics.teamRank.teamCount;
+                                data.teamAverageScoreContributionPercent = metrics.score / metrics.teamScore;
+                                data.teamGamesPlayed = 1;
+                            }
+                            else {
+                                data.teamBestRank = { rank: 0, teamCount: 0, totalPlayers: 0 };
+                                data.teamBestRankPercentile = 1;
+                                data.teamAverageRankPercentile = 1;
+                                data.teamHighestScore = 0;
+                                data.teamAverageScore = 0;
+                                data.teamAveragePlayers = 0;
+                                data.teamAverageScorePerPlayer = 0;
+                                data.teamAverageScoreContributionPercent = 0;
+                                data.teamGamesPlayed = 0;
+                            }
+
                             store.put(data);
                         }
                         else createNewBoardEntry(store, metrics);
@@ -228,7 +323,16 @@ function createNewBoardEntry(store, metrics) {
         uniqueWords: metrics.uniqueWords,
         longestWords: metrics.longestWords,
         wordsCount: metrics.words.length,
-        gamesPlayed: 1
+        gamesPlayed: 1,
+        teamBestRank: metrics.hasTeam ? metrics.teamRank : { rank: 0, teamCount: 0, totalPlayers: 0 },
+        teamBestRankPercentile: metrics.hasTeam ? metrics.teamRankPercentile : 1,
+        teamAverageRankPercentile: metrics.hasTeam ? metrics.teamRankPercentile : 1,
+        teamHighestScore: metrics.hasTeam ? metrics.teamScore : 0,
+        teamAverageScore: metrics.hasTeam ? metrics.teamScore : 0,
+        teamAveragePlayers: metrics.hasTeam ? metrics.teamRank.teamCount : 0,
+        teamAverageScorePerPlayer: metrics.hasTeam ? metrics.teamScore / metrics.teamRank.teamCount : 0,
+        teamAverageScoreContributionPercent: metrics.hasTeam ? metrics.score / metrics.teamScore : 0,
+        teamGamesPlayed: metrics.hasTeam ? 1 : 0
     });
 }
 
@@ -264,46 +368,41 @@ function getGameMetrics(cb) {
             }
         };
     };
+    return true;    //must return 'true' here in order for browser to keep the port open for a response
 }
 
-chrome.runtime.onMessage.addListener(
-    function _messageHandler(request, sender, sendResponse) {
-        if ('get_metrics' === request.action) {
-            getGameMetrics(sendResponse);
-            //must return 'true' here in order for chrome to keep the port open for a response
-            return true;
-        }
-    }
-);
+extension.runtime.onMessage.addListener((request, sender, sendResponse) => getGameMetrics(sendResponse));
 
-//Overrides the minGameTime variable if found in chrome storage
-chrome.storage.sync.get(['min_time'], function _storageRequestCallback(result) {
+//Overrides the minGameTime variable if found in browser storage
+extension.storage.sync.get(['min_time'], function _storageRequestCallback(result) {
     minGameTime = result && result.min_time ? result.min_time * 1000 : minGameTime;
 });
 
-//Overrides the minGameWords variable if found in chrome storage
-chrome.storage.sync.get(['min_words'], function _storageRequestCallback(result) {
+//Overrides the minGameWords variable if found in browser storage
+extension.storage.sync.get(['min_words'], function _storageRequestCallback(result) {
     minGameWords = result && result.min_words ? result.min_words : minGameWords;
 });
 
 //Clears out the 4x4 game metrics and resets the option to 'false' afterwards
-chrome.storage.sync.get(['clear_4'], function _storageRequestClear4Callback(result) {
+extension.storage.sync.get(['clear_4'], function _storageRequestClear4Callback(result) {
     if (result && result.clear_4) {
         let db = window.indexedDB.open('wordsplay_metrics', version);
         db.onupgradeneeded = event => event.target.result.createObjectStore('wordsplay_metrics', { keyPath: 'id', autoIncrement: false });
-        db.onsuccess = event => event.target.result.transaction('wordsplay_metrics', 'readwrite').objectStore('wordsplay_metrics').delete('b4x4');
-
-        chrome.storage.sync.set({ clear_4: false }, noop);
+        db.onsuccess = function _clear4By4DataSuccess(evt) {
+            evt.target.result.transaction('wordsplay_metrics', 'readwrite').objectStore('wordsplay_metrics').delete('b4x4');
+            extension.storage.sync.set({ clear_4: false }, noop);
+        };
     }
 });
 
 //Clears out the 5x5 game metrics and resets the option to 'false' afterwards
-chrome.storage.sync.get(['clear_5'], function _storageRequestClear5Callback(result) {
+extension.storage.sync.get(['clear_5'], function _storageRequestClear5Callback(result) {
     if (result && result.clear_5) {
         let db = window.indexedDB.open('wordsplay_metrics', version);
         db.onupgradeneeded = event => event.target.result.createObjectStore('wordsplay_metrics', { keyPath: 'id', autoIncrement: false });
-        db.onsuccess = event => event.target.result.transaction('wordsplay_metrics', 'readwrite').objectStore('wordsplay_metrics').delete('b5x5');
-
-        chrome.storage.sync.set({ clear_5: false }, noop);
+        db.onsuccess = function _clear5By5DataSuccess(evt) {
+            evt.target.result.transaction('wordsplay_metrics', 'readwrite').objectStore('wordsplay_metrics').delete('b5x5');
+            extension.storage.sync.set({ clear_5: false }, noop);
+        };
     }
 });
