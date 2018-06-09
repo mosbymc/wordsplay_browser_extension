@@ -3,9 +3,10 @@ window.indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndex
 var extension;  //save the vendor-specific extension namespace to a variable so this extension can be cross platform
 
 try {
-    //For some reason, both Edge and Chrome will throw when testing like so: 'chrome && chrome.runtime...' if
-    //the variable does not exist within scope. I've never seen behavior like this before and according to spec
-    //it shouldn't throw. So instead I am using 'typeof' as a workaround to prevent the exception
+    //For some reason, both Edge and Chrome will throw when testing like so: 'chrome && chrome.runtime...'
+    //Essentially the '&&' is not being short-circuited, so if the 'chrome' variable does not exist, then the application
+    //throws when 'chrome.runtime' is checked for existence. I've never seen behavior like this before and the expression
+    //should be short-circuiting... So instead I am using 'typeof' as a workaround to prevent the exception
     extension = 'undefined' !== typeof chrome && chrome.runtime ? chrome : browser;
 }
 catch(e) {
@@ -95,7 +96,8 @@ setInterval(function _gameMonitor() {
                 if (!recordedMetrics && startTime - minGameTime >= 0 !== startTime && !computing) {
                     computing = true;   //set the computing var to 'true', if the computations take more than 5 second (unlikely), then we won't
                                         //try to record them again while the first is still computing
-                    saveGameMetrics(computeMetrics(getGameWords(), getUniqueWords(), getGameRank(), getTeamMetrics()));
+                    let gameWords = getGameWords();
+                    if (gameWords.length) saveGameMetrics(computeMetrics(gameWords, getUniqueWords(), getGameRank(), getTeamMetrics()));
                     recordedMetrics = true;
                     startTime = -1;     //set the startTime var back to -1 for the next game
                     computing = false;  //set computing var back to 'false' for the next game
@@ -123,21 +125,14 @@ function getGameWords() {
 
 //Retrieves the player's game rank and the total number of players in the game
 function getGameRank() {
-    try {
-        let rank = Array.prototype.concat.apply([], Array.from(document.querySelectorAll('.me'))
-                .map(div => Array.from(div.querySelectorAll('.x-grid3-cell-inner'))))[0].innerText,
-            totalPlayers = Array.from(document.getElementById('ext-gen493').querySelectorAll('.x-grid3-row'));
+    let rank = Array.prototype.concat.apply([], Array.from(document.querySelectorAll('.me'))
+            .map(div => Array.from(div.querySelectorAll('.x-grid3-cell-inner'))))[0].innerText,
+        totalPlayers = Array.from(document.getElementById('ext-gen493').querySelectorAll('.x-grid3-row'));
 
-        return {
-            rank: Number.parseInt(rank),
-            totalPlayers: Number.parseInt(totalPlayers[totalPlayers.length - 1].querySelectorAll('.x-grid3-cell-inner')[0].innerText)
-        };
-    }
-        //If the player guessed no words, then there is no span with a 'me' class, so the attempt to get the innerText will throw.
-        //Since we don't record games with no points anyway, we just return a dummy object here - it won't be recorded
-    catch(e) {
-        return { rank: 0, totalPlayers: 0 };
-    }
+    return {
+        rank: Number.parseInt(rank),
+        totalPlayers: Number.parseInt(totalPlayers[totalPlayers.length - 1].querySelectorAll('.x-grid3-cell-inner')[0].innerText)
+    };
 }
 
 //Gets all the unique words guessed by the player during the game
@@ -149,14 +144,13 @@ function getUniqueWords() {
 
 function getTeamMetrics() {
     try {
-        let names = document.querySelectorAll('.me')[0].querySelectorAll('.x-grid3-col-name')[0].innerText.trim().split(':');
+        let names = document.querySelectorAll('.me')[0].querySelectorAll('.x-grid3-col-name')[0].innerText.trim().split(':'),
+            teamName = names[0],
+            playerName = names[1],
+            recordedTeam = false,
+            teamRank = 0, teamScore = 0, teamCount = 0;
 
-        if (1 < names.length) {
-            let teamName = names[0],
-                playerName = names[1],
-                recordedTeam = false,
-                teamRank, teamScore, teamCount = 0;
-
+        if (playerName) {   //if the playerName is undefined, it means the player is not a member of a team
             Array.from(document.getElementById('ext-gen493').querySelectorAll('.x-grid3-col-name'))
                 .forEach(function _findTeam(playerDiv) {
                     if (playerDiv.innerText.includes(teamName) && !playerDiv.innerText.includes(playerName) && !recordedTeam) {
@@ -166,11 +160,9 @@ function getTeamMetrics() {
                     }
                     else if (playerDiv.innerText.includes(teamName)) teamCount++;
                 });
-
-            if (teamRank) return { rank: teamRank, score: teamScore, teamCount: teamCount };
-            else return { rank: 0, score: 0, teamCount: 0 };
         }
-        else return { rank: 0, score: 0, teamCount: 0 };
+
+        return { rank: teamRank, score: teamScore, teamCount: teamCount };
     }
     catch(e) {
         return { rank: 0, score: 0, teamCount: 0 };
