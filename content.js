@@ -32,9 +32,9 @@ var version = 1,                    //db version number
         averageRankPercentile: 1,
         uniqueWords: [],
         longestWords: [],
-        teamBestRank: { rank: 0, teamCount: 0, totalPlayers: 0 },
+        teamBestRank: { rank: 9999, teamCount: 0, totalPlayers: 0 },
         teamBestRankPercentile: 1,
-        teamAverageRankPercentile: 1,
+        teamAverageRankPercentile: 0,
         teamHighestScore: 0,
         teamAverageScore: 0,
         teamAverageScorePerPlayer: 0,
@@ -245,7 +245,7 @@ function saveGameMetrics(metrics) {
                             data.gamesPlayed += 1;
                             data.wordsCount = data.wordsCount + metrics.words.length;
 
-                            if (metrics.hasTeam && data.teamGamesPlayed) {
+                            if (metrics.hasTeam) {
                                 if (metrics.teamRank.rank < data.teamBestRank) data.teamBestRank = metrics.teamRank;
                                 else if (metrics.teamRank.rank === data.teamBestRank.rank && metrics.totalPlayers > data.teamBestRank.totalPlayers)
                                     data.teamBestRank = metrics.teamRank;
@@ -261,28 +261,6 @@ function saveGameMetrics(metrics) {
                                 data.teamAverageScoreContributionPercent = ((data.teamGamesPlayed * data.teamAverageScoreContributionPercent)
                                     + (metrics.score / metrics.teamScore)) / data.gamesPlayed + 1;
                                 data.teamGamesPlayed++;
-                            }
-                            else if (metrics.hasTeam) {
-                                data.teamBestRank = metrics.teamRank;
-                                data.teamBestRankPercentile = metrics.teamRankPercentile;
-                                data.teamAverageRankPercentile = metrics.teamRankPercentile;
-                                data.teamHighestScore = metrics.teamScore;
-                                data.teamAverageScore = metrics.teamScore;
-                                data.teamAveragePlayers = metrics.teamRank.teamCount;
-                                data.teamAverageScorePerPlayer = metrics.teamScore / metrics.teamRank.teamCount;
-                                data.teamAverageScoreContributionPercent = metrics.score / metrics.teamScore;
-                                data.teamGamesPlayed = 1;
-                            }
-                            else {
-                                data.teamBestRank = { rank: 0, teamCount: 0, totalPlayers: 0 };
-                                data.teamBestRankPercentile = 1;
-                                data.teamAverageRankPercentile = 1;
-                                data.teamHighestScore = 0;
-                                data.teamAverageScore = 0;
-                                data.teamAveragePlayers = 0;
-                                data.teamAverageScorePerPlayer = 0;
-                                data.teamAverageScoreContributionPercent = 0;
-                                data.teamGamesPlayed = 0;
                             }
 
                             store.put(data);
@@ -316,9 +294,9 @@ function createNewBoardEntry(store, metrics) {
         longestWords: metrics.longestWords,
         wordsCount: metrics.words.length,
         gamesPlayed: 1,
-        teamBestRank: metrics.hasTeam ? metrics.teamRank : { rank: 0, teamCount: 0, totalPlayers: 0 },
+        teamBestRank: metrics.hasTeam ? metrics.teamRank : { rank: 9999, teamCount: 0, totalPlayers: 0 },
         teamBestRankPercentile: metrics.hasTeam ? metrics.teamRankPercentile : 1,
-        teamAverageRankPercentile: metrics.hasTeam ? metrics.teamRankPercentile : 1,
+        teamAverageRankPercentile: metrics.hasTeam ? metrics.teamRankPercentile : 0,
         teamHighestScore: metrics.hasTeam ? metrics.teamScore : 0,
         teamAverageScore: metrics.hasTeam ? metrics.teamScore : 0,
         teamAveragePlayers: metrics.hasTeam ? metrics.teamRank.teamCount : 0,
@@ -366,14 +344,10 @@ function getGameMetrics(cb) {
 extension.runtime.onMessage.addListener((request, sender, sendResponse) => getGameMetrics(sendResponse));
 
 //Overrides the minGameTime variable if found in browser storage
-extension.storage.sync.get(['min_time'], function _storageRequestCallback(result) {
-    minGameTime = result && result.min_time ? result.min_time * 1000 : minGameTime;
-});
+extension.storage.sync.get(['min_time'], result => minGameTime = result && result.min_time ? result.min_time * 1000 : minGameTime);
 
 //Overrides the minGameWords variable if found in browser storage
-extension.storage.sync.get(['min_words'], function _storageRequestCallback(result) {
-    minGameWords = result && result.min_words ? result.min_words : minGameWords;
-});
+extension.storage.sync.get(['min_words'], result => minGameWords = result && result.min_words ? result.min_words : minGameWords);
 
 //Clears out the 4x4 game metrics and resets the option to 'false' afterwards
 extension.storage.sync.get(['clear_4'], function _storageRequestClear4Callback(result) {
