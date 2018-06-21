@@ -16,6 +16,9 @@ catch(e) {
 var version = 1,                    //db version number
     minGameTime = 120000,           //default min game time if not set in google storage from options page
     minGameWords = 1,               //default min game words if not set in google storage from options page
+    timeoutLength = 120000,         //default game timeout length if not set in google storage from options page
+    wordCount = 0,                  //used to determine if the user is still playing the game
+    timeoutTick = 0,
     startTime = -1,                 //stores the start time of the current game to be compared to the minGameTime var during recording
     recordedMetrics = false,        //prevents the game from recording the same metrics more than once
     computing = false,              //prevents the game from computing the metrics more than once due to the game loop
@@ -64,6 +67,7 @@ setInterval(function _gameMonitor() {
                 //this game's results and start recording data on the next game
                 if (minGameTime <= time) {
                     startTime = time;
+                    timeoutTick = Date.now();
                     isBig = document.getElementById(b4x4Id).classList.contains('x-hide-display');
                 }
             }
@@ -76,6 +80,19 @@ setInterval(function _gameMonitor() {
         if (timerSpan = document.getElementById('ext-gen233')) {
             //if  the timerSpan shows 'Time left:' then we're still in the middle of a game
             if (~timerSpan.innerText.indexOf('Time left:')) {
+                let words = getGameWords().length,
+                    now = Date.now();
+                //if the number of words guessed hasn't changed since the last tick and the current time minus
+                //the last timeoutTick is greater than the timeoutLength, then the player has timed out...
+                //..reset the startTime and wordCount variables for the next game; this one won't be recorded.
+                if (words === wordCount && now - timeoutTick >= timeoutLength) {
+                    startTime = -1;
+                    wordCount = 0;
+                }
+                else if (words !== wordCount) {
+                    wordCount = words;
+                    timeoutTick = now;
+                }
                 //If the start time was recorded for a big board, but the game was changed to the small board before finishing,
                 //the reset the start time to be recorded on the next tick and update the 'isBig' flag...
                 if (isBig && document.getElementById(b5x5Id).classList.contains('x-hide-display')) {
@@ -101,6 +118,7 @@ setInterval(function _gameMonitor() {
                     recordedMetrics = true;
                     startTime = -1;     //set the startTime var back to -1 for the next game
                     computing = false;  //set computing var back to 'false' for the next game
+                    wordCount = 0;      //set the wordCount back to zero for the next game
                 }
             }
         }
@@ -348,6 +366,9 @@ extension.storage.sync.get(['min_time'], result => minGameTime = result && resul
 
 //Overrides the minGameWords variable if found in browser storage
 extension.storage.sync.get(['min_words'], result => minGameWords = result && result.min_words ? result.min_words : minGameWords);
+
+//Overrides the timeoutLength variable if found in browser storage
+extension.storage.sync.get(['timeout_length'], result => timeoutLength = result && result.timeout_length ? result.timeout_length * 1000 : timeoutLength);
 
 //Clears out the 4x4 game metrics and resets the option to 'false' afterwards
 extension.storage.sync.get(['clear_4'], function _storageRequestClear4Callback(result) {

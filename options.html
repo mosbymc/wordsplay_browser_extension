@@ -20,6 +20,12 @@
     The default minimum game words is 1, which means that you must get at least one word in a game in order
     for the extension to recored the game's metrics. The value cannot be set to less than 1.
     <br><br>
+    Game Timeout Length:
+    The default value is 120 seconds, which means that if 120 or more second pass without at least one word
+    being guessed by the player, then the game's metrics will not be recorded. This is to prevent a recording
+    of the metrics during a game in which the player leaves or becomes distracted. The maximum value allowed
+    is 180 and the minimum is value allowed is 20.
+    <br><br>
     Both minimums are required to be met, not either/or. If the value provided cannot be parsed as an integer,
     or does not meet min/max criteria you will recieve an error message alerting you to the problem.
     <br><br>
@@ -39,6 +45,11 @@
     <div id='words'>
                 <span>
                     Mimimum Words: <input type='text' id='min_words' />
+                </span>
+    </div>
+    <div id='timeout'>
+                <span>
+                    Game Timeout Length (In Seconds): <input type='text' id='timeout_length' />
                 </span>
     </div>
     <br>

@@ -1,7 +1,10 @@
 var extension = 'undefined' !== typeof chrome && chrome.storage ? chrome : browser,
     defaultMinTime = 120,
     defaultMinWords = 1,
-    maxMinTime = 176;
+    defaultTimeOutLength = 120,
+    maxMinTime = 176,
+    maxTimeoutTime = 181,
+    minTimeoutTime = 19;
 
 function noop() {}
 
@@ -13,6 +16,10 @@ function getStorageValues() {
 
     extension.storage.sync.get(['min_words'], function _storageRequestCallback(result) {
         document.getElementById('min_words').value = result && result.min_words ? result.min_words : defaultMinWords;
+    });
+
+    extension.storage.sync.get(['timeout_length'], function _storageRequestCallback(result) {
+        document.getElementById('timeout_length').value = result && result.timeout_length ? result.timeout_length : defaultTimeOutLength;
     });
 
     extension.storage.sync.get(['clear_4'], function _storageRequestClear4Callback(result) {
@@ -50,7 +57,7 @@ document.getElementById('min_time').addEventListener('input', function _minTimeI
         if (!(found = errorSpan = document.getElementById('time_error'))) errorSpan = createErrorSpan('time_error');
 
         if (Number.isNaN(val)) errorSpan.innerText = 'The value entered is not a number. Please enter a number or the previously saved value will be used instead.';
-        else if (maxMinTime < val) errorSpan.innerText = 'The value entered is too high. Please enter a number less than 176 seconds.';
+        else if (maxMinTime < val) errorSpan.innerText = `The value entered is too high. Please enter a number less than ${maxMinTime} seconds.`;
         else errorSpan.innerText = 'The minimum time value cannot be less than zero. Please enter a larger number.';
 
         if (!found) document.getElementById('time').appendChild(errorSpan);
@@ -76,16 +83,37 @@ document.getElementById('min_words').addEventListener('input', function _minWord
     }
 });
 
+document.getElementById('timeout_length').addEventListener('input', function _timeoutLengthHandler(e) {
+    let val = Number.parseInt(e.target.value);
+    if (!Number.isNaN(val) && minTimeoutTime < val && maxTimeoutTime > val) {
+        let errorSpan = document.getElementById('time_length_error');
+        if (errorSpan) document.getElementById('timeout').removeChild(errorSpan);
+    }
+    else {
+        let errorSpan,
+            found;
+        if (!(found = errorSpan = document.getElementById('time_length_error'))) errorSpan = createErrorSpan('time_length_error');
+
+        if (Number.isNaN(val)) errorSpan.innerText = 'The value entered is not a number. Please enter a number or the previously saved value will be used instead.';
+        else if (maxTimeoutTime <= val) errorSpan.innerText = `The value entered is too high. Please enter a number less than ${maxTimeoutTime} seconds.`;
+        else errorSpan.innerText = `The minimum time value cannot be less than ${minTimeoutTime}. Please enter a larger number.`;
+
+        if (!found) document.getElementById('timeout').appendChild(errorSpan);
+    }
+});
+
 //Click event handler for the submit button. If there are no errors, all values are saved, otherwise none are.
 document.getElementById('submit').addEventListener('click', function _submitOptionsHandler(e) {
-    let error = document.getElementById('time_error') || document.getElementById('word_error');
+    let error = document.getElementById('time_error') || document.getElementById('word_error') || document.getElementById('time_length_error');
 
     if (!error) {
         let timeVal = Number.parseInt(document.getElementById('min_time').value),
-            wordVal = Number.parseInt(document.getElementById('min_words').value);
+            wordVal = Number.parseInt(document.getElementById('min_words').value),
+            timeoutVale = Number.parseInt(document.getElementById('timeout_length').value);
 
         extension.storage.sync.set({ min_time: timeVal }, noop);
         extension.storage.sync.set({ min_words: wordVal }, noop);
+        extension.storage.sync.set({ timeout_length: timeoutVale }, noop);
         extension.storage.sync.set({ clear_4: document.getElementById('b4x4').checked }, noop);
         extension.storage.sync.set({ clear_5: document.getElementById('b5x5').checked }, noop);
     }
